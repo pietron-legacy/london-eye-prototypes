@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>London Eye Kiosk Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ----------------------------------------------------------------
+     KIOSK PROTOTYPE
+     Real device resolution: 1080 x 1920 (portrait)
+     The .kiosk-frame stays at 1080x1920 internally. JS scales it so
+     the entire frame always fits the browser window (letterboxed).
+
+     STRUCTURE
+     - .kiosk-frame
+       - .page.page-home        (home + london-eye-expanded states)
+       - .page.page-ticket-...  (one per ticket detail)
+     Page swapping is driven by data-page on .kiosk-frame.
+     The home page additionally has data-view ("home" | "london-eye")
+     also set on .kiosk-frame, which controls in-page state.
+  -----------------------------------------------------------------*/
+
+  :root {
+    --surface-default: #F6F7F7;
+    --surface-reverse: #FFFFFF;
+    --text-title: #031419;
+    --text-main: #031419;
+    --text-subtitle: #536B75;
+    --border-default: #06232C;
+    --border-main-default: #CCD2D8;
+    --palette-neutral-75: #F6F7F7;
+    --button-default: #06232C;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #1a1a1a;
+    overflow: hidden;
+    font-family: 'Montserrat', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .kiosk-stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .kiosk-frame {
+    width: 1080px;
+    height: 1920px;
+    flex: 0 0 auto;
+    transform-origin: center center;
+    background: var(--surface-default);
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+  }
+
+  /* ============================ PAGES ============================ */
+  .page {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 350ms ease;
+  }
+  .kiosk-frame[data-page="home"]               .page-home,
+  .kiosk-frame[data-page="ticket-le-standard"] .page-ticket-le-standard {
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 2;
+  }
+
+  /* Scrollable content region inside any page */
+  .scroll-area {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-default);
+    transition: padding 400ms ease;
+  }
+  .scroll-area > * + * { margin-top: 24px; }
+  .scroll-area::-webkit-scrollbar { display: none; }
+  .scroll-area { scrollbar-width: none; }
+
+  /* ============================ CARD ============================ */
+  .card {
+    background: var(--surface-reverse);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ============================ HEADER ============================ */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .header-logo { flex: 1; position: relative; }
+  .header-logo img {
+    width: 200px;
+    height: 64px;
+    object-fit: contain;
+    object-position: left center;
+    display: block;
+  }
+  .header-logo .placeholder-logo {
+    width: 200px;
+    height: 64px;
+    background: linear-gradient(135deg, #f0f4f7, #e0e8ee);
+    border: 1px dashed var(--border-main-default);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--text-subtitle);
+  }
+
+  .btn-icon-round {
+    width: 64px;
+    height: 64px;
+    border-radius: 1000px;
+    background: var(--palette-neutral-75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .btn-icon-round:active { background: #e6e9eb; }
+  .btn-icon-round svg {
+    width: 36px;
+    height: 36px;
+    display: block;
+  }
+
+  .lang-pill {
+    padding: 8px 16px 8px 8px;
+    background: var(--palette-neutral-75);
+    border-radius: 100px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 0 0 auto;
+  }
+  .lang-pill .flag {
+    width: 48px;
+    height: 48px;
+    border-radius: 64px;
+    border: 1px solid var(--border-main-default);
+    object-fit: cover;
+    background: #f0f4f7;
+  }
+  .lang-pill .placeholder-flag {
+    width: 48px;
+    height: 48px;
+    border-radius: 64px;
+    border: 1px solid var(--border-main-default);
+    background: linear-gradient(135deg, #ddd, #bbb);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--text-subtitle);
+  }
+  .lang-pill .label {
+    color: var(--text-main);
+    font-size: 28px;
+    font-weight: 400;
+    line-height: 36px;
+  }
+  .lang-pill .chevron {
+    width: 18px;
+    height: 10px;
+    position: relative;
+  }
+  .lang-pill .chevron::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--text-main);
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 10'><path d='M1 1l8 8 8-8' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / contain;
+            mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 10'><path d='M1 1l8 8 8-8' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / contain;
+  }
+
+  /* ============================ HOME PAGE: SECTIONS ============================ */
+  .section-title {
+    color: var(--text-title);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .section-subhead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .section-subhead .label {
+    color: var(--text-title);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 32px;
+  }
+  .section-subhead .meta {
+    color: var(--text-title);
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 26px;
+  }
+  .section-subhead .meta b { font-weight: 600; }
+
+  /* Multi-attractions and single-attraction sections fade out when
+     entering the london-eye expanded view. */
+  .section-collapse { transition: opacity 300ms ease, transform 300ms ease; }
+  .kiosk-frame[data-view="london-eye"] .section-collapse {
+    opacity: 0;
+    transform: translateY(40px);
+    pointer-events: none;
+  }
+  .section-collapse.is-removed { display: none; }
+
+  /* London-eye section — title swap between compact/expanded views */
+  .title-expanded {
+    display: none;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .title-expanded h1 {
+    margin: 0;
+    color: var(--text-title);
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 72px;
+  }
+  .title-expanded p {
+    margin: 0;
+    color: var(--text-title);
+    font-size: 40px;
+    font-weight: 400;
+    line-height: 48px;
+  }
+  .kiosk-frame[data-view="london-eye"] .section-london-eye .title-compact-block { display: none; }
+  .kiosk-frame[data-view="london-eye"] .section-london-eye .title-expanded { display: flex; }
+  .kiosk-frame[data-view="london-eye"] .section-london-eye .show-all-row { display: none; }
+  .kiosk-frame[data-view="london-eye"] .section-london-eye { gap: 48px; }
+
+  /* Reserve room at the bottom for the back-bar in expanded view */
+  .kiosk-frame[data-view="london-eye"] .page-home .scroll-area { padding-bottom: 168px; }
+
+  /* ============================ TICKET CARDS ============================ */
+  .ticket-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+  .ticket {
+    width: 312px;
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    cursor: pointer;
+    transition: transform 200ms ease;
+  }
+  .ticket:active { transform: scale(0.98); }
+
+  .ticket--expanded-only { display: none; }
+  .kiosk-frame[data-view="london-eye"] .ticket--expanded-only { display: flex; }
+
+  .ticket-image {
+    width: 312px;
+    height: 468px;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #f0f4f7;
+    position: relative;
+  }
+  .ticket-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    position: relative;
+    z-index: 1;
+  }
+  .ticket-image .placeholder {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #f0f4f7, #d8e2e8);
+    border: 1px dashed var(--border-main-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-subtitle);
+    font-size: 16px;
+    font-weight: 500;
+    text-align: center;
+    padding: 16px;
+    z-index: 0;
+  }
+  .ticket-info { display: flex; flex-direction: column; gap: 8px; }
+  .ticket-title {
+    color: var(--text-title);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+  }
+  .ticket-description {
+    color: var(--text-main);
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 28px;
+  }
+  .ticket-strike {
+    color: var(--text-subtitle);
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 28px;
+    text-decoration: line-through;
+  }
+  .ticket-price-row { display: flex; align-items: center; gap: 8px; }
+  .ticket-price-row .from {
+    color: var(--text-main);
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 24px;
+  }
+  .ticket-price-row .price {
+    color: var(--text-title);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 28px;
+  }
+
+  /* Show-all button row */
+  .show-all-row {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .btn-outlined {
+    padding: 8px 24px;
+    border-radius: 64px;
+    outline: 2px solid var(--border-default);
+    outline-offset: -2px;
+    background: transparent;
+    color: var(--text-title);
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-outlined:active { background: rgba(0,0,0,0.05); }
+
+  /* ============================ BOTTOM BARS ============================ */
+  /* Shared base for any sticky bottom bar (back-bar / footer-bar) */
+  .bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 24px;
+    right: 24px;
+    padding: 24px 0;
+    background: var(--surface-default);
+    display: flex;
+    align-items: center;
+    z-index: 20;
+  }
+  .bottom-bar::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    height: 73px;
+    background: linear-gradient(0deg, var(--surface-default) 40%, rgba(255,255,255,0) 100%);
+    pointer-events: none;
+  }
+
+  /* Home page back-bar: only visible in london-eye view */
+  .page-home .bottom-bar.back-bar {
+    transform: translateY(110%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 400ms ease 250ms, opacity 250ms ease 250ms;
+  }
+  .kiosk-frame[data-view="london-eye"] .page-home .bottom-bar.back-bar {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Buttons inside bottom bars */
+  .btn-secondary {
+    height: 88px;
+    min-width: 168px;
+    padding: 8px 40px;
+    background: var(--surface-reverse);
+    border-radius: 64px;
+    outline: 2px solid var(--border-main-default);
+    outline-offset: -2px;
+    border: none;
+    color: var(--text-title);
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .btn-secondary:active { background: #f0f4f7; }
+  .btn-secondary--full { flex: 1; }
+  .btn-primary {
+    flex: 1;
+    height: 88px;
+    min-width: 168px;
+    padding: 8px 40px;
+    background: var(--button-default);
+    border-radius: 64px;
+    border: none;
+    color: white;
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .btn-primary:active { background: #0a3540; }
+
+  /* Detail-page footer holds two buttons with a 24px gap */
+  .footer-bar { gap: 24px; }
+
+  /* ============================ DETAIL PAGE ============================ */
+  .scroll-area--detail { padding-bottom: 168px; gap: 0; }
+  /* Override the universal margin rule so we can use a 40px gap between
+     the detail blocks (header card / gallery / info card) per spec. */
+  .scroll-area--detail > * + * { margin-top: 40px; }
+
+  .detail-header-card { gap: 48px; }
+  .detail-title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .detail-title-block h1 {
+    margin: 0;
+    color: #12222E;
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 72px;
+  }
+  .detail-title-block .subtitle {
+    color: var(--text-title);
+    font-size: 48px;
+    font-weight: 400;
+    line-height: 56px;
+  }
+
+  .image-gallery {
+    display: flex;
+    gap: 24px;
+    height: 412.8px;
+  }
+  .img-hero {
+    flex: 1;
+    height: 100%;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #f0f4f7;
+    position: relative;
+  }
+  .img-side-stack {
+    width: 388.8px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    height: 100%;
+    flex: 0 0 auto;
+  }
+  .img-side {
+    flex: 1;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #f0f4f7;
+    position: relative;
+  }
+  .img-hero img,
+  .img-side img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    position: relative;
+    z-index: 1;
+  }
+  .img-hero .placeholder,
+  .img-side .placeholder {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #f0f4f7, #d8e2e8);
+    border: 1px dashed var(--border-main-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-subtitle);
+    font-size: 16px;
+    text-align: center;
+    padding: 16px;
+    z-index: 0;
+  }
+
+  .detail-info {
+    background: var(--surface-reverse);
+    border-radius: 24px;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 0 0 auto;
+  }
+  .detail-info .info-heading {
+    margin: 0;
+    color: var(--text-main);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+  }
+  .detail-info .info-text {
+    margin: 0;
+    color: var(--text-main);
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 32px;
+  }
+  .detail-info .info-text .info-emphasis {
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<div class="kiosk-stage">
+  <div class="kiosk-frame" id="kioskFrame" data-page="home" data-view="home">
+
+    <!-- =================================================================
+         PAGE: HOME  (also hosts the london-eye expanded view)
+    ================================================================== -->
+    <div class="page page-home">
+      <div class="scroll-area" id="homeScroll">
+
+        <!-- Header card -->
+        <div class="card">
+          <div class="header">
+            <div class="header-logo">
+              <img id="img-brand-logo" alt="London Eye logo" src=""
+                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+              <div class="placeholder-logo">LONDON EYE LOGO</div>
+            </div>
+            <div class="lang-pill">
+              <img id="img-lang-flag" class="flag" alt="UK flag" src=""
+                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+              <div class="placeholder-flag">UK</div>
+              <div class="label">English</div>
+              <div class="chevron"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LONDON EYE TICKETS -->
+        <div class="card section-london-eye" id="sectionLondonEye">
+          <div class="title-compact-block">
+            <div class="section-title">London Eye tickets</div>
+          </div>
+          <div class="title-expanded">
+            <h1>London Eye tickets</h1>
+            <p>Explore and select local attraction tickets</p>
+          </div>
+
+          <div class="section-subhead title-compact-block">
+            <div class="label">Popular tickets</div>
+            <div class="meta">Showing <b>3</b> of 4 experiences</div>
+          </div>
+
+          <div class="ticket-grid">
+            <!-- Standard -->
+            <div class="ticket" data-ticket="le-standard">
+              <div class="ticket-image">
+                <img id="img-london-eye-standard" alt="London Eye Standard" src=""
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye<br/>Standard ticket</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye | Standard Ticket</div>
+                <div class="ticket-description">Take flight on the London eye</div>
+                <div class="ticket-strike">£38.00</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£33.00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fast Track -->
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-london-eye-fasttrack" alt="London Eye Fast Track" src=""
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye<br/>Fast Track</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye | Fast Track Ticket</div>
+                <div class="ticket-description">Take flight on the London eye</div>
+                <div class="ticket-strike">£54.00</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£44.00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- + River Cruise -->
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-london-eye-rivercruise" alt="London Eye + River Cruise" src=""
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye<br/>+ River Cruise</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye + River Cruise</div>
+                <div class="ticket-description">The ultimate sightseeing ticket</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£49.00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Champagne (expanded view only) -->
+            <div class="ticket ticket--expanded-only">
+              <div class="ticket-image">
+                <img id="img-london-eye-champagne" alt="London Eye hosted Champagne experience" src=""
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye<br/>Champagne experience</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye hosted Champagne experience</div>
+                <div class="ticket-description">Enjoy champagne on board and priority entry</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£49.00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="show-all-row">
+            <button class="btn-outlined" id="btnShowAllLondonEye">Show all tickets</button>
+          </div>
+        </div>
+
+        <!-- MULTI-ATTRACTIONS -->
+        <div class="card section-collapse">
+          <div class="section-title">Multi-attractions tickets</div>
+          <div class="section-subhead">
+            <div class="label">Popular tickets</div>
+            <div class="meta">Showing <b>3</b> of 45 experiences</div>
+          </div>
+
+          <div class="ticket-grid">
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-multi-tussauds" alt="London Eye + Madame Tussauds" src=""
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye<br/>+ Madame Tussauds</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye + Madame Tussauds</div>
+                <div class="ticket-description">Visir the two top London attractions</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£49.00</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-multi-tussauds-sealife" alt="London Eye + Madame Tussauds + Sea Life Aquarium" src=""
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye + Tussauds<br/>+ Sea Life</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye + Madame Tussauds + Sea Life Aquarium</div>
+                <div class="ticket-description">Enjoy four of London top attractions</div>
+                <div class="ticket-strike">£78.00</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£49.00</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-multi-five" alt="Five attractions combo" src=""
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">Five-attraction<br/>combo</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London eye + Madame Tussands + Shrek's adventure + London D...</div>
+                <div class="ticket-description">Enjoy five of London top attractions</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£69.00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="show-all-row">
+            <button class="btn-outlined">Show all tickets</button>
+          </div>
+        </div>
+
+        <!-- SINGLE ATTRACTION -->
+        <div class="card section-collapse">
+          <div class="section-title">Single attraction tickets</div>
+          <div class="section-subhead">
+            <div class="label">Popular tickets</div>
+            <div class="meta">Showing <b>3</b> of 6 experiences</div>
+          </div>
+
+          <div class="ticket-grid">
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-single-sealife" alt="Sea Life" src=""
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">Sea Life<br/>London Aquarium</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">Sea life | Standard ticket</div>
+                <div class="ticket-description">Dive deepeer to see marine life from every part of the world</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£33.00</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-single-tussauds" alt="Madame Tussauds" src=""
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">Madame Tussauds</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">Madame Tussauds | Standard ticket</div>
+                <div class="ticket-description">Enjoy famous fun and take a selfie with you favourite celeb...</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£33.00</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-single-dungeon" alt="London Dungeon" src=""
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Dungeon</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Dungeon | Standard entry</div>
+                <div class="ticket-description">Have a thrill-filled journey through London's murky past!</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£33.00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="show-all-row">
+            <button class="btn-outlined">Show all tickets</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Back bar (visible only when in london-eye view) -->
+      <div class="bottom-bar back-bar" id="backBar">
+        <button class="btn-secondary btn-secondary--full" id="btnBack">Back</button>
+      </div>
+    </div>
+
+    <!-- =================================================================
+         PAGE: TICKET DETAIL — LONDON EYE | STANDARD TICKET
+    ================================================================== -->
+    <div class="page page-ticket-le-standard">
+      <div class="scroll-area scroll-area--detail">
+
+        <!-- Header card with title -->
+        <div class="card detail-header-card">
+          <div class="header">
+            <div class="header-logo">
+              <img id="img-brand-logo-2" alt="London Eye logo" src=""
+                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+              <div class="placeholder-logo">LONDON EYE LOGO</div>
+            </div>
+
+            <button class="btn-icon-round" id="btnHome" aria-label="Home">
+              <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4.5 15.5 L18 5 L31.5 15.5 V30 a2 2 0 0 1 -2 2 H22.5 V21 H13.5 V32 H6.5 a2 2 0 0 1 -2 -2 Z"
+                      fill="#031419"/>
+              </svg>
+            </button>
+
+            <div class="lang-pill">
+              <img id="img-lang-flag-2" class="flag" alt="UK flag" src=""
+                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+              <div class="placeholder-flag">UK</div>
+              <div class="label">English</div>
+              <div class="chevron"></div>
+            </div>
+          </div>
+
+          <div class="detail-title-block">
+            <h1>London Eye | Standard ticket</h1>
+            <div class="subtitle">London Eye</div>
+          </div>
+        </div>
+
+        <!-- Image gallery: 1 hero + 2 stacked -->
+        <div class="image-gallery">
+          <div class="img-hero">
+            <img id="img-detail-le-standard-hero" alt="London Eye hero" src=""
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+            <div class="placeholder">Hero image</div>
+          </div>
+          <div class="img-side-stack">
+            <div class="img-side">
+              <img id="img-detail-le-standard-2" alt="" src=""
+                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+              <div class="placeholder">Image 2</div>
+            </div>
+            <div class="img-side">
+              <img id="img-detail-le-standard-3" alt="" src=""
+                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+              <div class="placeholder">Image 3</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info card -->
+        <div class="detail-info">
+          <h3 class="info-heading">General Information</h3>
+          <p class="info-text">Lorem ipsum dolor sit amet consectetur. Lacinia aliquet sit vel congue vivamus scelerisque vitae consectetur donec. Magnis id luctus scelerisque mauris. Vitae nec nullam mi fermentum. Viverra aliquam mauris tortor facilisis ultricies luctus eget.</p>
+          <p class="info-text"><span class="info-emphasis">⭐ London Eye </span>Lorem ipsum dolor sit amet consectetur. Lacinia aliquet sit vel congue vivamus scelerisque vitae consectetur donec. Magnis id luctus scelerisque mauris. Vitae nec nullam mi fermentum. Viverra aliquam mauris tortor facilisis ultricies luctus eget.</p>
+          <h3 class="info-heading">How to get there</h3>
+          <p class="info-text">Lorem ipsum dolor sit amet consectetur. Lacinia aliquet sit vel congue vivamus scelerisque vitae consectetur donec. Magnis id luctus scelerisque mauris. Vitae nec nullam mi fermentum. Viverra aliquam mauris tortor facilisis ultricies luctus eget.</p>
+        </div>
+
+      </div>
+
+      <!-- Footer with Back + Buy tickets -->
+      <div class="bottom-bar footer-bar">
+        <button class="btn-secondary" id="btnDetailBack">Back</button>
+        <button class="btn-primary" id="btnBuyTickets">Buy tickets</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  /* ------------------------------------------------------------------
+     IMAGE PATHS
+     ------------------------------------------------------------------
+     All images live in the SAME folder as this HTML on GitHub. Adjust
+     filenames here if yours differ. Each <img> falls back to a
+     labelled placeholder if the file is missing.
+  ------------------------------------------------------------------- */
+  const IMAGES = {
+    'img-brand-logo':              'london-eye-logo.png',
+    'img-brand-logo-2':            'london-eye-logo.png',
+    'img-lang-flag':               'flag-uk.png',
+    'img-lang-flag-2':             'flag-uk.png',
+
+    'img-london-eye-standard':     'london-eye-standard.png',
+    'img-london-eye-fasttrack':    'london-eye-fasttrack.png',
+    'img-london-eye-rivercruise':  'london-eye-rivercruise.png',
+    'img-london-eye-champagne':    'london-eye-champagne.png',
+
+    'img-multi-tussauds':          'multi-tussauds.png',
+    'img-multi-tussauds-sealife':  'multi-tussauds-sealife.png',
+    'img-multi-five':              'multi-five.png',
+
+    'img-single-sealife':          'single-sealife.png',
+    'img-single-tussauds':         'single-tussauds.png',
+    'img-single-dungeon':          'single-dungeon.png',
+
+    /* Detail page: London Eye | Standard ticket */
+    'img-detail-le-standard-hero': 'london-eye-detail-hero.png',
+    'img-detail-le-standard-2':    'london-eye-detail-2.png',
+    'img-detail-le-standard-3':    'london-eye-detail-3.png',
+  };
+
+  Object.entries(IMAGES).forEach(([id, src]) => {
+    if (!src) return;
+    const el = document.getElementById(id);
+    if (el) el.src = src;
+  });
+
+  /* ------------------------------------------------------------------
+     NAVIGATION
+     ------------------------------------------------------------------
+     - data-page on .kiosk-frame chooses which page is visible.
+     - data-view on .kiosk-frame is only meaningful inside page-home;
+       it controls the home / london-eye-expanded sub-state.
+     - returnState remembers where Back should return to from a detail.
+  ------------------------------------------------------------------- */
+  const frame   = document.getElementById('kioskFrame');
+  const homeScroll = document.getElementById('homeScroll');
+
+  let returnState = { page: 'home', view: 'home' };
+  const FADE_MS = 320;
+  let removeTimer = null;
+
+  function setView(view) {
+    const sections = document.querySelectorAll('.section-collapse');
+    if (removeTimer) { clearTimeout(removeTimer); removeTimer = null; }
+
+    if (view === 'london-eye') {
+      sections.forEach(s => s.classList.remove('is-removed'));
+      void homeScroll.offsetHeight;
+      frame.dataset.view = 'london-eye';
+      removeTimer = setTimeout(() => {
+        if (frame.dataset.view === 'london-eye') {
+          sections.forEach(s => s.classList.add('is-removed'));
+        }
+      }, FADE_MS);
+    } else {
+      sections.forEach(s => s.classList.remove('is-removed'));
+      void homeScroll.offsetHeight;
+      frame.dataset.view = 'home';
+    }
+
+    homeScroll.scrollTop = 0;
+  }
+
+  function setPage(page) {
+    frame.dataset.page = page;
+    // Each page has its own scroll-area; reset its scrollTop on entry.
+    const newPageEl = document.querySelector(`.page-${page} .scroll-area`);
+    if (newPageEl) newPageEl.scrollTop = 0;
+  }
+
+  function navigateToTicket(ticketId) {
+    // Remember where to return to (which page + view) before leaving.
+    returnState = {
+      page: frame.dataset.page,
+      view: frame.dataset.view,
+    };
+    setPage('ticket-' + ticketId);
+  }
+
+  function navigateBack() {
+    const { page, view } = returnState;
+    setPage(page);
+    // Restore the home page sub-view (home or london-eye expanded)
+    if (page === 'home') frame.dataset.view = view || 'home';
+  }
+
+  function navigateHome() {
+    setPage('home');
+    setView('home');
+    returnState = { page: 'home', view: 'home' };
+  }
+
+  /* Wire up controls */
+  document.getElementById('btnShowAllLondonEye')
+          .addEventListener('click', () => setView('london-eye'));
+  document.getElementById('btnBack')
+          .addEventListener('click', () => setView('home'));
+  document.getElementById('btnDetailBack')
+          .addEventListener('click', navigateBack);
+  document.getElementById('btnHome')
+          .addEventListener('click', navigateHome);
+  document.getElementById('btnBuyTickets')
+          .addEventListener('click', () => {
+            // Placeholder: hook this to checkout/cart in a later page.
+            console.log('Buy tickets clicked');
+          });
+
+  // Ticket card clicks: any element with data-ticket="..." navigates.
+  document.querySelectorAll('[data-ticket]').forEach(el => {
+    el.addEventListener('click', () => {
+      navigateToTicket(el.dataset.ticket);
+    });
+  });
+
+  /* ------------------------------------------------------------------
+     FIT-TO-VIEWPORT SCALING
+  ------------------------------------------------------------------- */
+  const FRAME_W = 1080;
+  const FRAME_H = 1920;
+  function fit() {
+    const scale = Math.min(window.innerWidth / FRAME_W, window.innerHeight / FRAME_H);
+    frame.style.transform = `scale(${scale})`;
+  }
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', fit);
+  fit();
+</script>
+
+</body>
+</html>
