@@ -1,0 +1,3350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>London Eye Kiosk Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ----------------------------------------------------------------
+     KIOSK PROTOTYPE
+     Real device resolution: 1080 x 1920 (portrait)
+     The .kiosk-frame stays at 1080x1920 internally. JS scales it so
+     the entire frame always fits the browser window (letterboxed).
+
+     STRUCTURE
+     - .kiosk-frame
+       - .page.page-home        (home + london-eye-expanded states)
+       - .page.page-ticket-...  (one per ticket detail)
+     Page swapping is driven by data-page on .kiosk-frame.
+     The home page additionally has data-view ("home" | "london-eye")
+     also set on .kiosk-frame, which controls in-page state.
+  -----------------------------------------------------------------*/
+
+  :root {
+    --surface-default: #F6F7F7;
+    --surface-reverse: #FFFFFF;
+    --text-title: #031419;
+    --text-main: #031419;
+    --text-subtitle: #536B75;
+    --border-default: #06232C;
+    --border-main-default: #CCD2D8;
+    --palette-neutral-75: #F6F7F7;
+    --button-default: #06232C;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #1a1a1a;
+    overflow: hidden;
+    font-family: 'Montserrat', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .kiosk-stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .kiosk-frame {
+    width: 1080px;
+    height: 1920px;
+    flex: 0 0 auto;
+    transform-origin: center center;
+    background: var(--surface-default);
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+  }
+
+  /* ============================ PAGES ============================ */
+  .page {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 350ms ease;
+  }
+  .kiosk-frame[data-page="home"]               .page-home,
+  .kiosk-frame[data-page="ticket-le-standard"] .page-ticket-le-standard,
+  .kiosk-frame[data-page="ticket-buy"]         .page-ticket-buy,
+  .kiosk-frame[data-page="checkout"]           .page-checkout,
+  .kiosk-frame[data-page="payment-method"]     .page-payment-method,
+  .kiosk-frame[data-page="order"]              .page-order {
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 2;
+  }
+
+  /* Scrollable content region inside any page */
+  .scroll-area {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-default);
+    transition: padding 400ms ease;
+  }
+  .scroll-area > * + * { margin-top: 24px; }
+  .scroll-area::-webkit-scrollbar { display: none; }
+  .scroll-area { scrollbar-width: none; }
+
+  /* ============================ CARD ============================ */
+  .card {
+    background: var(--surface-reverse);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ============================ HEADER ============================ */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .header-logo { flex: 1; position: relative; }
+  .header-logo img {
+    width: 200px;
+    height: 64px;
+    object-fit: contain;
+    object-position: left center;
+    display: block;
+  }
+  .header-logo .placeholder-logo {
+    width: 200px;
+    height: 64px;
+    background: linear-gradient(135deg, #f0f4f7, #e0e8ee);
+    border: 1px dashed var(--border-main-default);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--text-subtitle);
+  }
+
+  .btn-icon-round {
+    width: 64px;
+    height: 64px;
+    border-radius: 1000px;
+    background: var(--palette-neutral-75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .btn-icon-round:active { background: #e6e9eb; }
+  .btn-icon-round svg {
+    width: 36px;
+    height: 36px;
+    display: block;
+  }
+
+  .lang-pill {
+    padding: 8px 16px 8px 8px;
+    background: var(--palette-neutral-75);
+    border-radius: 100px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 0 0 auto;
+  }
+  .lang-pill .flag {
+    width: 48px;
+    height: 48px;
+    border-radius: 64px;
+    border: 1px solid var(--border-main-default);
+    object-fit: cover;
+    background: #f0f4f7;
+  }
+  .lang-pill .placeholder-flag {
+    width: 48px;
+    height: 48px;
+    border-radius: 64px;
+    border: 1px solid var(--border-main-default);
+    background: linear-gradient(135deg, #ddd, #bbb);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--text-subtitle);
+  }
+  .lang-pill .label {
+    color: var(--text-main);
+    font-size: 28px;
+    font-weight: 400;
+    line-height: 36px;
+  }
+  .lang-pill .chevron {
+    width: 18px;
+    height: 10px;
+    position: relative;
+  }
+  .lang-pill .chevron::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--text-main);
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 10'><path d='M1 1l8 8 8-8' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / contain;
+            mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 10'><path d='M1 1l8 8 8-8' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / contain;
+  }
+
+  /* ============================ HOME PAGE: SECTIONS ============================ */
+  .section-title {
+    color: var(--text-title);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .section-subhead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .section-subhead .label {
+    color: var(--text-title);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 32px;
+  }
+  .section-subhead .meta {
+    color: var(--text-title);
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 26px;
+  }
+  .section-subhead .meta b { font-weight: 600; }
+
+  /* Multi-attractions and single-attraction sections fade out when
+     entering the london-eye expanded view. */
+  .section-collapse { transition: opacity 300ms ease, transform 300ms ease; }
+  .kiosk-frame[data-view="london-eye"] .section-collapse {
+    opacity: 0;
+    transform: translateY(40px);
+    pointer-events: none;
+  }
+  .section-collapse.is-removed { display: none; }
+
+  /* London-eye section — title swap between compact/expanded views */
+  .title-expanded {
+    display: none;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .title-expanded h1 {
+    margin: 0;
+    color: var(--text-title);
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 72px;
+  }
+  .title-expanded p {
+    margin: 0;
+    color: var(--text-title);
+    font-size: 40px;
+    font-weight: 400;
+    line-height: 48px;
+  }
+  .kiosk-frame[data-view="london-eye"] .section-london-eye .title-compact-block { display: none; }
+  .kiosk-frame[data-view="london-eye"] .section-london-eye .title-expanded { display: flex; }
+  .kiosk-frame[data-view="london-eye"] .section-london-eye .show-all-row { display: none; }
+  .kiosk-frame[data-view="london-eye"] .section-london-eye { gap: 48px; }
+
+  /* Reserve room at the bottom for the back-bar in expanded view */
+  .kiosk-frame[data-view="london-eye"] .page-home .scroll-area { padding-bottom: 168px; }
+
+  /* ============================ TICKET CARDS ============================ */
+  .ticket-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+  .ticket {
+    width: 312px;
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    cursor: pointer;
+    transition: transform 200ms ease;
+  }
+  .ticket:active { transform: scale(0.98); }
+
+  .ticket--expanded-only { display: none; }
+  .kiosk-frame[data-view="london-eye"] .ticket--expanded-only { display: flex; }
+
+  /* Default (home view): square images */
+  .ticket-image {
+    width: 312px;
+    height: 312px;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #f0f4f7;
+    position: relative;
+  }
+  .ticket-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    position: relative;
+    z-index: 1;
+  }
+  .ticket-image .placeholder {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #f0f4f7, #d8e2e8);
+    border: 1px dashed var(--border-main-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-subtitle);
+    font-size: 16px;
+    font-weight: 500;
+    text-align: center;
+    padding: 16px;
+    z-index: 0;
+  }
+  .ticket-info { display: flex; flex-direction: column; gap: 8px; }
+  /* Title clamped to 2 lines (with truncation) so all cards align
+     perfectly regardless of title length. Used everywhere — home view AND
+     the london-eye expanded view share the same compact card design. */
+  .ticket-title {
+    color: var(--text-title);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    height: 64px; /* exactly 2 line-heights */
+  }
+  /* Description and strikethrough price are never shown on ticket cards in
+     either view (kept in markup for future use). */
+  .ticket-description, .ticket-strike { display: none; }
+  .ticket-price-row { display: flex; align-items: center; gap: 8px; }
+  .ticket-price-row .from {
+    color: var(--text-main);
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 24px;
+  }
+  .ticket-price-row .price {
+    color: var(--text-title);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 28px;
+  }
+
+  /* Section header row: title on the left, "See all tickets" pill on the right */
+  .section-header-row {
+    align-self: stretch;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+  }
+  /* Section cards (London Eye / Multi / Single) use a slightly larger gap */
+  .card.section-london-eye,
+  .card.section-collapse {
+    gap: 32px;
+  }
+  /* Show-all button row (legacy — only used inside collapsed sections) */
+  .show-all-row {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .btn-outlined {
+    padding: 8px 24px;
+    border-radius: 64px;
+    outline: 2px solid var(--border-default);
+    outline-offset: -2px;
+    background: transparent;
+    color: var(--text-title);
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-outlined:active { background: rgba(0,0,0,0.05); }
+
+  /* ============================ BOTTOM BARS ============================ */
+  /* Shared base for any sticky bottom bar (back-bar / footer-bar) */
+  .bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 24px;
+    right: 24px;
+    padding: 24px 0;
+    background: var(--surface-default);
+    display: flex;
+    align-items: center;
+    z-index: 20;
+  }
+  .bottom-bar::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    height: 73px;
+    background: linear-gradient(0deg, var(--surface-default) 40%, rgba(255,255,255,0) 100%);
+    pointer-events: none;
+  }
+
+  /* Home page back-bar: only visible in london-eye view */
+  .page-home .bottom-bar.back-bar {
+    transform: translateY(110%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 400ms ease 250ms, opacity 250ms ease 250ms;
+  }
+  .kiosk-frame[data-view="london-eye"] .page-home .bottom-bar.back-bar {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Buttons inside bottom bars */
+  .btn-secondary {
+    height: 88px;
+    min-width: 168px;
+    padding: 8px 40px;
+    background: var(--surface-reverse);
+    border-radius: 64px;
+    outline: 2px solid var(--border-main-default);
+    outline-offset: -2px;
+    border: none;
+    color: var(--text-title);
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .btn-secondary:active { background: #f0f4f7; }
+  .btn-secondary--full { flex: 1; }
+  .btn-primary {
+    flex: 1;
+    height: 88px;
+    min-width: 168px;
+    padding: 8px 40px;
+    background: var(--button-default);
+    border-radius: 64px;
+    border: none;
+    color: white;
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .btn-primary:active { background: #0a3540; }
+
+  /* Detail-page footer holds two buttons with a 24px gap */
+  .footer-bar { gap: 24px; }
+
+  /* ============================ DETAIL PAGE ============================ */
+  .scroll-area--detail { padding-bottom: 168px; gap: 0; }
+  /* Override the universal margin rule so we can use a 40px gap between
+     the detail blocks (header card / gallery / info card) per spec. */
+  .scroll-area--detail > * + * { margin-top: 40px; }
+
+  .detail-header-card { gap: 48px; }
+  .detail-title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .detail-title-block h1 {
+    margin: 0;
+    color: #12222E;
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 72px;
+  }
+  .detail-title-block .subtitle {
+    color: var(--text-title);
+    font-size: 48px;
+    font-weight: 400;
+    line-height: 56px;
+  }
+
+  .image-gallery {
+    display: flex;
+    gap: 24px;
+    height: 412.8px;
+  }
+  .img-hero {
+    flex: 1;
+    height: 100%;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #f0f4f7;
+    position: relative;
+  }
+  .img-side-stack {
+    width: 388.8px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    height: 100%;
+    flex: 0 0 auto;
+  }
+  .img-side {
+    flex: 1;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #f0f4f7;
+    position: relative;
+  }
+  .img-hero img,
+  .img-side img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    position: relative;
+    z-index: 1;
+  }
+  .img-hero .placeholder,
+  .img-side .placeholder {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #f0f4f7, #d8e2e8);
+    border: 1px dashed var(--border-main-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-subtitle);
+    font-size: 16px;
+    text-align: center;
+    padding: 16px;
+    z-index: 0;
+  }
+
+  .detail-info {
+    background: var(--surface-reverse);
+    border-radius: 24px;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 0 0 auto;
+  }
+  .detail-info .info-heading {
+    margin: 0;
+    color: var(--text-main);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+  }
+  .detail-info .info-text {
+    margin: 0;
+    color: var(--text-main);
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 32px;
+  }
+  .detail-info .info-text .info-emphasis {
+    font-weight: 700;
+  }
+
+  /* ============================ BUY-TICKETS PAGE ============================ */
+  .scroll-area--buy {
+    padding-bottom: 168px;
+    gap: 0;
+  }
+  .scroll-area--buy > * + * { margin-top: 24px; }
+
+  /* Header card on the buy page is the same layout as the detail-header-card,
+     but it carries the page title (e.g. "Standard tickets") underneath. */
+  .buy-header-card .detail-title-block h1 {
+    font-size: 64px;
+    line-height: 72px;
+  }
+  .buy-header-card .detail-title-block .subtitle {
+    font-size: 48px;
+    line-height: 56px;
+  }
+
+  /* Generic content card on the buy page (date / tickets / extras) */
+  .buy-card {
+    background: var(--surface-reverse);
+    border-radius: 24px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+  }
+  .buy-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .buy-card-title {
+    color: var(--text-main);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .buy-card-subtitle {
+    color: #2C4751;
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 32px;
+  }
+
+  /* ---------- Combined card (single card containing multiple sections) ---------- */
+  .buy-card--combined { gap: 56px; }
+  .combined-section {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .combined-section-title {
+    color: var(--text-main);
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 40px;
+  }
+  /* Flat (no period tabs) time-pill row. Single horizontal row that
+     scrolls horizontally if there are more pills than fit. */
+  .time-pill-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .time-pill-row::-webkit-scrollbar { display: none; }
+  .time-pill-row { scrollbar-width: none; }
+  /* Date / time pill disabled state — used for time slots that have
+     already passed today. */
+  .date-pill[data-state="disabled"] {
+    background: #F2F3F3;
+    outline-color: #F2F3F3;
+    color: #A7B2BA;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  /* Two-line layout inside a date / time pill */
+  .date-pill .pill-lines {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  /* SVG inside the small extras row icon block */
+  .stepper-info .row-icon svg { width: 16px; height: 16px; display: block; }
+
+  /* ---------- Date row ---------- */
+  /* Single horizontal row that scrolls horizontally to reveal more days. */
+  .date-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .date-row::-webkit-scrollbar { display: none; }
+  .date-row { scrollbar-width: none; }
+  .date-pill { scroll-snap-align: start; }
+  .date-pill {
+    width: 128px;
+    height: 96px;
+    padding: 16px;
+    background: var(--surface-reverse);
+    border-radius: 16px;
+    outline: 2px solid var(--border-main-default);
+    outline-offset: -2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-title);
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+    cursor: pointer;
+    border: none;
+    flex: 0 0 auto;
+    position: relative;
+    overflow: hidden;
+  }
+  .date-pill[data-state="selected"] {
+    outline-color: var(--border-default);
+  }
+  .date-pill[data-state="selected"]::after {
+    content: '';
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    top: 0;
+    right: 0;
+    background: var(--button-default);
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M0,0 L32,0 L32,32 Z' fill='black'/></svg>") no-repeat center / cover;
+            mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M0,0 L32,0 L32,32 Z' fill='black'/></svg>") no-repeat center / cover;
+  }
+  .date-pill .date-line {
+    display: block;
+    line-height: 32px;
+  }
+  .date-pill-more {
+    flex: 1;
+    height: 96px;
+    padding: 16px;
+    background: var(--surface-reverse);
+    border-radius: 16px;
+    outline: 2px solid var(--border-main-default);
+    outline-offset: -2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+  }
+  .date-pill-more svg { width: 36px; height: 36px; display: block; }
+
+  /* ---------- Time-period tabs ---------- */
+  .time-tabs {
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    height: 48px;
+  }
+  .time-tab {
+    flex: 1;
+    padding: 8px 24px;
+    border: none;
+    background: transparent;
+    border-bottom: 2px solid var(--border-main-default);
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 32px;
+    color: var(--text-subtitle);
+    cursor: pointer;
+    text-align: center;
+    transition: color 150ms ease, border-color 150ms ease, font-weight 150ms ease;
+  }
+  .time-tab[data-state="selected"] {
+    border-bottom: 4px solid var(--border-default);
+    color: var(--text-title);
+    font-weight: 700;
+  }
+
+  /* ---------- Time slot cards ---------- */
+  /* Single-row horizontal scroller — slots never wrap to a new line. */
+  .time-slot-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    /* small bottom padding so the focus ring/outline isn't clipped */
+    padding-bottom: 4px;
+  }
+  .time-slot-row::-webkit-scrollbar { display: none; }
+  .time-slot-row { scrollbar-width: none; }
+  .time-slot { scroll-snap-align: start; }
+  .time-slot {
+    width: 200px;
+    background: var(--surface-reverse);
+    border-radius: 16px;
+    outline: 2px solid var(--border-main-default);
+    outline-offset: -2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+    overflow: hidden;
+    position: relative;
+    flex: 0 0 auto;
+  }
+  .time-slot[data-state="selected"] {
+    outline-color: var(--border-default);
+  }
+  .time-slot[data-state="selected"]::before {
+    content: '';
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    top: 0;
+    right: 0;
+    background: var(--button-default);
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M0,0 L32,0 L32,32 Z' fill='black'/></svg>") no-repeat center / cover;
+            mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M0,0 L32,0 L32,32 Z' fill='black'/></svg>") no-repeat center / cover;
+  }
+  .time-slot .slot-time {
+    padding-top: 16px;
+    color: var(--text-title);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+  }
+  .time-slot .slot-price {
+    padding-bottom: 4px;
+    color: var(--text-title);
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 32px;
+  }
+  .time-slot .slot-spots {
+    align-self: stretch;
+    background: #F2F3F3;
+    padding: 4px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--text-subtitle);
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 28px;
+  }
+  .time-slot .slot-spots svg {
+    width: 22px; height: 22px;
+    display: block;
+  }
+
+  /* ---------- Ticket / Extras stepper rows ---------- */
+  .stepper-list {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  /* Each row consists of an info-side + an action-side joined together with
+     a connector notch in the middle. We achieve that look with two flex
+     children and shared border styling. */
+  .stepper-row {
+    display: flex;
+    align-items: stretch;
+    background: var(--surface-reverse);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .stepper-info {
+    flex: 1;
+    padding: 24px;
+    border: 2px solid var(--border-main-default);
+    border-right: none;
+    border-radius: 16px 0 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    justify-content: center;
+  }
+  .stepper-action {
+    flex: 0 0 auto;
+    padding: 24px;
+    border: 2px solid var(--border-main-default);
+    border-left: none;
+    border-radius: 0 16px 16px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .stepper-row[data-selected="true"] .stepper-info,
+  .stepper-row[data-selected="true"] .stepper-action {
+    border-color: var(--border-default);
+  }
+  .stepper-row[data-selected="true"] .stepper-action::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 32px;
+    height: 32px;
+    background: var(--button-default);
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M0,0 L32,0 L32,32 Z' fill='black'/></svg>") no-repeat center / cover;
+            mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M0,0 L32,0 L32,32 Z' fill='black'/></svg>") no-repeat center / cover;
+  }
+  .stepper-info .row-title {
+    color: var(--text-main);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 36px;
+  }
+  .stepper-info .row-title-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .stepper-info .row-icon {
+    width: 32px;
+    height: 32px;
+    background: #F2F3F3;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-subtitle);
+    font-size: 14px;
+  }
+  .stepper-info .row-add-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .stepper-info .row-add-label {
+    color: var(--text-main);
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 28px;
+  }
+  .stepper-info .row-strike {
+    color: var(--text-subtitle);
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 28px;
+    text-decoration: line-through;
+  }
+  .stepper-info .row-price {
+    color: var(--text-main);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 36px;
+  }
+  .stepper-info .row-description {
+    color: var(--text-subtitle);
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 28px;
+  }
+  .stepper-info .row-more-link {
+    color: var(--button-default);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 28px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stepper-info .row-more-link::after {
+    content: '';
+    width: 14px;
+    height: 14px;
+    background: currentColor;
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3 6l5 5 5-5' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / contain;
+            mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3 6l5 5 5-5' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / contain;
+  }
+
+  /* Discount pill */
+  .discount-badge {
+    align-self: flex-start;
+    padding: 2px 8px;
+    background: #EB0052;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 24px;
+  }
+
+  /* Stepper buttons (minus / count / plus) */
+  .stepper-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 100px;
+    outline: 2px solid var(--border-main-default);
+    outline-offset: -2px;
+  }
+  .stepper-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 64px;
+    border: none;
+    background: var(--button-default);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .stepper-btn:active { transform: scale(0.96); }
+  .stepper-btn[disabled] {
+    background: #F2F3F3;
+    color: #A7B2BA;
+    cursor: default;
+  }
+  .stepper-btn svg { width: 26px; height: 26px; display: block; }
+  .stepper-count {
+    min-width: 48px;
+    text-align: center;
+    color: var(--text-title);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 32px;
+  }
+
+  /* Extras: extras rows include an image on the left side */
+  .extras-row .stepper-info {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .extras-row .extras-img {
+    width: 140px;
+    height: 140px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #f0f4f7, #d8e2e8);
+    flex: 0 0 auto;
+  }
+  .extras-row .extras-text-block {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  /* ============================ ICONS ============================ */
+  /* Generic <img class="icon-img" data-icon="X"> usage. JS sets the src
+     from the ICONS map. If the image fails to load, the inline SVG
+     fallback in the next sibling becomes visible. */
+  .icon-img-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+  .icon-img-wrap img.icon-img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+  }
+  .icon-img-wrap .icon-fb {
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-img-wrap .icon-fb svg { width: 100%; height: 100%; display: block; }
+
+  /* ============================ MODAL ============================ */
+  .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease;
+  }
+  .modal-overlay.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .modal-panel {
+    width: 754px;
+    max-height: 90%;
+    background: var(--surface-reverse);
+    border-radius: 24px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateY(12px) scale(0.98);
+    transition: transform 220ms ease;
+  }
+  .modal-overlay.is-open .modal-panel {
+    transform: translateY(0) scale(1);
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    padding: 24px;
+    gap: 16px;
+  }
+  .modal-header-spacer,
+  .modal-icon-btn {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 auto;
+  }
+  .modal-icon-btn {
+    border-radius: 64px;
+    background: var(--palette-neutral-75);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .modal-icon-btn:active { background: #e6e9eb; }
+  .modal-icon-btn .icon-img-wrap { width: 18px; height: 18px; }
+  .modal-header-title {
+    flex: 1;
+    text-align: center;
+    color: var(--text-main);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 32px;
+  }
+  .modal-body {
+    padding: 0 48px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    overflow-y: auto;
+  }
+  .modal-body::-webkit-scrollbar { display: none; }
+  .modal-body { scrollbar-width: none; }
+  .modal-image {
+    align-self: stretch;
+    height: 372px;
+    border-radius: 24px;
+    overflow: hidden;
+    position: relative;
+    background: linear-gradient(135deg, #f0f4f7, #d8e2e8);
+    flex: 0 0 auto;
+  }
+  .modal-image img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .modal-image .placeholder {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-subtitle);
+    font-size: 18px;
+  }
+  .modal-text {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .modal-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  .modal-title {
+    color: var(--text-main);
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 40px;
+  }
+  .modal-discount-badge {
+    background: #EB0052;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .modal-discount-badge .icon-img-wrap { width: 18px; height: 18px; }
+  .modal-description {
+    color: var(--text-main);
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 30px;
+  }
+  .modal-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .modal-info-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-main);
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 30px;
+  }
+  .modal-info-row b { font-weight: 700; }
+  .modal-info-row .icon-img-wrap { width: 26px; height: 26px; }
+  .modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .btn-modal-secondary {
+    height: 88px;
+    background: var(--surface-reverse);
+    border: none;
+    border-radius: 64px;
+    outline: 2px solid #000;
+    outline-offset: -2px;
+    font-family: inherit;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 32px;
+    color: var(--text-main);
+    cursor: pointer;
+    padding: 8px 32px;
+    text-align: center;
+  }
+  .btn-modal-secondary:active { background: #f0f4f7; }
+  .btn-modal-secondary .strike {
+    font-size: 18px;
+    font-weight: 400;
+    text-decoration: line-through;
+    color: var(--text-main);
+  }
+  .btn-modal-primary {
+    height: 88px;
+    background: var(--button-default);
+    border: none;
+    border-radius: 64px;
+    color: white;
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+    cursor: pointer;
+    padding: 8px 32px;
+    text-align: center;
+  }
+  .btn-modal-primary:active { background: #0a3540; }
+
+  /* ============================ CHECKOUT PAGE ============================ */
+  .scroll-area--checkout {
+    padding-bottom: 168px;
+    gap: 0;
+  }
+  .scroll-area--checkout > * + * { margin-top: 24px; }
+
+  .checkout-card {
+    background: var(--surface-reverse);
+    border-radius: 24px;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .checkout-section-title {
+    color: var(--text-title);
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 40px;
+  }
+  .checkout-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .checkout-block-title {
+    color: var(--text-main);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+  }
+  .checkout-info-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: var(--text-title);
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 36px;
+  }
+  .checkout-info-row .icon-img-wrap {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    margin-top: 2px;
+  }
+  .checkout-divider {
+    align-self: stretch;
+    height: 1px;
+    background: var(--border-main-default);
+  }
+  .checkout-line-items {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .line-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    color: var(--text-title);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 32px;
+  }
+  .line-item .line-count {
+    width: 44px;
+    flex: 0 0 auto;
+  }
+  .line-item .line-label {
+    flex: 1;
+  }
+  .line-item .line-price {
+    flex: 0 0 auto;
+    text-align: right;
+  }
+
+  /* Coupon */
+  .coupon-row {
+    display: flex;
+    gap: 24px;
+    align-items: stretch;
+  }
+  .coupon-input {
+    flex: 1;
+    height: 88px;
+    padding: 16px 24px;
+    background: white;
+    border-radius: 8px;
+    outline: 1px solid var(--border-main-default);
+    outline-offset: -1px;
+    border: none;
+    font-family: inherit;
+    font-size: 22px;
+    color: var(--text-title);
+  }
+  .coupon-input::placeholder { color: var(--text-subtitle); }
+  .coupon-input:focus { outline-color: var(--border-default); }
+  .btn-coupon-apply {
+    height: 88px;
+    min-width: 168px;
+    padding: 8px 40px;
+    background: #F2F3F3;
+    color: #A7B2BA;
+    border: none;
+    border-radius: 64px;
+    font-family: inherit;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 32px;
+    cursor: not-allowed;
+  }
+
+  /* Totals summary */
+  .checkout-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .checkout-tax-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-subtitle);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 28px;
+  }
+  .checkout-total-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .checkout-total-line .label {
+    color: var(--text-title);
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 40px;
+  }
+  .checkout-total-line .amount {
+    color: var(--text-title);
+    font-size: 38px;
+    font-weight: 700;
+    line-height: 48px;
+  }
+
+  /* Contact info card */
+  .contact-info-banner {
+    padding: 16px 12px;
+    background: #E6F4FF;
+    border-left: 4px solid #0068B0;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .contact-info-banner .heading {
+    color: #0068B0;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 28px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .contact-info-banner .heading .info-icon {
+    width: 24px; height: 24px;
+    border-radius: 64px;
+    background: #0068B0;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+  .contact-info-banner .body {
+    color: #0068B0;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 26px;
+  }
+  .contact-input {
+    width: 100%;
+    height: 88px;
+    padding: 16px 24px;
+    background: white;
+    border-radius: 8px;
+    outline: 1px solid var(--border-main-default);
+    outline-offset: -1px;
+    border: none;
+    font-family: inherit;
+    font-size: 22px;
+    color: var(--text-title);
+  }
+  .contact-input::placeholder { color: var(--text-subtitle); }
+  .contact-input:focus { outline-color: var(--border-default); }
+
+  .consent-row {
+    padding: 16px;
+    background: var(--palette-neutral-75);
+    border-radius: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    cursor: pointer;
+  }
+  .consent-row .checkbox {
+    width: 24px;
+    height: 24px;
+    background: var(--button-default);
+    border-radius: 4px;
+    flex: 0 0 auto;
+    margin-top: 4px;
+    position: relative;
+  }
+  .consent-row .checkbox::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: white;
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M5 12l5 5 9-9' stroke='black' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / 16px 16px;
+            mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M5 12l5 5 9-9' stroke='black' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / 16px 16px;
+  }
+  .consent-row[data-checked="false"] .checkbox {
+    background: white;
+    outline: 1px solid var(--border-default);
+    outline-offset: -1px;
+  }
+  .consent-row[data-checked="false"] .checkbox::after { display: none; }
+  .consent-row .text {
+    flex: 1;
+    color: var(--text-main);
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 28px;
+  }
+
+  /* ============================ PAYMENT METHOD PAGE ============================ */
+  .scroll-area--payment {
+    padding-bottom: 168px;
+    gap: 0;
+  }
+  .scroll-area--payment > * + * { margin-top: 24px; }
+
+  .payment-card {
+    background: var(--surface-reverse);
+    border-radius: 24px;
+    padding: 64px 40px;
+    flex: 1 1 auto;
+    min-height: 1100px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+  }
+  .payment-pinpad {
+    width: 280px;
+    height: 320px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 200ms ease;
+  }
+  .payment-pinpad:active { transform: scale(0.96); }
+  .payment-pinpad .pinpad-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  .payment-pinpad .pinpad-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .payment-pinpad .pinpad-fallback svg {
+    width: 100%;
+    height: 100%;
+  }
+  .payment-caption {
+    width: 600px;
+    max-width: 100%;
+    text-align: center;
+    color: var(--text-main);
+    font-size: 28px;
+    font-weight: 400;
+    line-height: 36px;
+  }
+  /* The payment page bottom bar uses a single full-width Back button. */
+  .footer-bar--single .btn-secondary { flex: 1; }
+  .footer-bar--single .btn-primary  { flex: 1; }
+
+  /* ============================ ORDER / SUCCESS PAGE ============================ */
+  .scroll-area--order {
+    padding-bottom: 168px;
+    gap: 0;
+  }
+  .scroll-area--order > * + * { margin-top: 24px; }
+
+  .order-card {
+    background: var(--surface-reverse);
+    border-radius: 24px;
+    padding: 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+    align-items: stretch;
+  }
+  .order-success-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 0 24px;
+  }
+  .order-check-icon {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: #83D3AA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .order-check-icon .inner {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: #24A865;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .order-check-icon svg {
+    width: 40px; height: 40px; display: block;
+  }
+  .order-thanks {
+    color: var(--text-main);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 48px;
+    text-align: center;
+  }
+  .order-collect {
+    color: var(--text-main);
+    font-size: 28px;
+    font-weight: 400;
+    line-height: 36px;
+    text-align: center;
+  }
+  .order-id-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    color: var(--text-main);
+    font-size: 28px;
+    line-height: 36px;
+  }
+  .order-id-row .label { font-weight: 400; }
+  .order-id-row .value {
+    color: #24A865;
+    font-weight: 700;
+  }
+  .order-divider {
+    height: 1px;
+    background: var(--border-main-default);
+  }
+  .order-manage-block {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+  .order-manage-title {
+    color: #2C4751;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 32px;
+  }
+  .order-manage-line {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #2C4751;
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 30px;
+  }
+  .order-manage-line b { font-weight: 700; }
+  .order-manage-line .icon-img-wrap {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+  }
+</style>
+</head>
+<body>
+
+<div class="kiosk-stage">
+  <div class="kiosk-frame" id="kioskFrame" data-page="home" data-view="home">
+
+    <!-- =================================================================
+         PAGE: HOME  (also hosts the london-eye expanded view)
+    ================================================================== -->
+    <div class="page page-home">
+      <div class="scroll-area" id="homeScroll">
+
+        <!-- Header card -->
+        <div class="card">
+          <div class="header">
+            <div class="header-logo">
+              <img id="img-brand-logo" alt="London Eye logo" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+            </div>
+            <div class="lang-pill">
+              <img id="img-lang-flag" class="flag" alt="UK flag" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+              <div class="label">English</div>
+              <div class="chevron"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LONDON EYE TICKETS -->
+        <div class="card section-london-eye" id="sectionLondonEye">
+          <div class="section-header-row title-compact-block">
+            <div class="section-title">London Eye tickets</div>
+            <button class="btn-outlined" id="btnShowAllLondonEye">See all tickets</button>
+          </div>
+          <div class="title-expanded">
+            <h1>London Eye tickets</h1>
+            <p>Explore and select local attraction tickets</p>
+          </div>
+
+          <div class="ticket-grid">
+            <!-- Standard -->
+            <div class="ticket" data-ticket="le-standard">
+              <div class="ticket-image">
+                <img id="img-london-eye-standard" alt="London Eye Standard" src=""
+                     onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye<br/>Standard ticket</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye | Standard Ticket</div>
+                <div class="ticket-description">Take flight on the London eye</div>
+                <div class="ticket-strike">£38.00</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£33.00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fast Track -->
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-london-eye-fasttrack" alt="London Eye Fast Track" src=""
+                     onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye<br/>Fast Track</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye | Fast Track Ticket</div>
+                <div class="ticket-description">Take flight on the London eye</div>
+                <div class="ticket-strike">£54.00</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£44.00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- + River Cruise -->
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-london-eye-rivercruise" alt="London Eye + River Cruise" src=""
+                     onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye<br/>+ River Cruise</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye + River Cruise</div>
+                <div class="ticket-description">The ultimate sightseeing ticket</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£49.00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Champagne (expanded view only) -->
+            <div class="ticket ticket--expanded-only">
+              <div class="ticket-image">
+                <img id="img-london-eye-champagne" alt="London Eye hosted Champagne experience" src=""
+                     onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye<br/>Champagne experience</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye hosted Champagne experience</div>
+                <div class="ticket-description">Enjoy champagne on board and priority entry</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£49.00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- MULTI-ATTRACTIONS -->
+        <div class="card section-collapse">
+          <div class="section-header-row">
+            <div class="section-title">Multi-attractions tickets</div>
+            <button class="btn-outlined">See all tickets</button>
+          </div>
+
+          <div class="ticket-grid">
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-multi-tussauds" alt="London Eye + Madame Tussauds" src=""
+                     onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye<br/>+ Madame Tussauds</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye + Madame Tussauds</div>
+                <div class="ticket-description">Visir the two top London attractions</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£49.00</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-multi-tussauds-sealife" alt="London Eye + Madame Tussauds + Sea Life Aquarium" src=""
+                     onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Eye + Tussauds<br/>+ Sea Life</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Eye + Madame Tussauds + Sea Life Aquarium</div>
+                <div class="ticket-description">Enjoy four of London top attractions</div>
+                <div class="ticket-strike">£78.00</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£49.00</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-multi-five" alt="Five attractions combo" src=""
+                     onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">Five-attraction<br/>combo</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London eye + Madame Tussands + Shrek's adventure + London D...</div>
+                <div class="ticket-description">Enjoy five of London top attractions</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£69.00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- SINGLE ATTRACTION -->
+        <div class="card section-collapse">
+          <div class="section-header-row">
+            <div class="section-title">Single attraction tickets</div>
+            <button class="btn-outlined">See all tickets</button>
+          </div>
+
+          <div class="ticket-grid">
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-single-sealife" alt="Sea Life" src=""
+                     onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">Sea Life<br/>London Aquarium</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">Sea life | Standard ticket</div>
+                <div class="ticket-description">Dive deepeer to see marine life from every part of the world</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£39.00</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-single-tussauds" alt="Madame Tussauds" src=""
+                     onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">Madame Tussauds</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">Madame Tussauds | Standard ticket</div>
+                <div class="ticket-description">Enjoy famous fun and take a selfie with you favourite celeb...</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£39.00</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ticket">
+              <div class="ticket-image">
+                <img id="img-single-dungeon" alt="London Dungeon" src=""
+                     onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+                <div class="placeholder">London Dungeon</div>
+              </div>
+              <div class="ticket-info">
+                <div class="ticket-title">London Dungeon | Standard entry</div>
+                <div class="ticket-description">Have a thrill-filled journey through London's murky past!</div>
+                <div class="ticket-price-row">
+                  <span class="from">From</span>
+                  <span class="price">£35.00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Back bar (visible only when in london-eye view) -->
+      <div class="bottom-bar back-bar" id="backBar">
+        <button class="btn-secondary btn-secondary--full" id="btnBack">Back</button>
+      </div>
+    </div>
+
+    <!-- =================================================================
+         PAGE: TICKET DETAIL — LONDON EYE | STANDARD TICKET
+    ================================================================== -->
+    <div class="page page-ticket-le-standard">
+      <div class="scroll-area scroll-area--detail">
+
+        <!-- Header card with title -->
+        <div class="card detail-header-card">
+          <div class="header">
+            <div class="header-logo">
+              <img id="img-brand-logo-2" alt="London Eye logo" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+            </div>
+
+            <button class="btn-icon-round" id="btnHome" aria-label="Home">
+              <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4.5 15.5 L18 5 L31.5 15.5 V30 a2 2 0 0 1 -2 2 H22.5 V21 H13.5 V32 H6.5 a2 2 0 0 1 -2 -2 Z"
+                      fill="#031419"/>
+              </svg>
+            </button>
+
+            <div class="lang-pill">
+              <img id="img-lang-flag-2" class="flag" alt="UK flag" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+              <div class="label">English</div>
+              <div class="chevron"></div>
+            </div>
+          </div>
+
+          <div class="detail-title-block">
+            <h1>London Eye | Standard ticket</h1>
+            <div class="subtitle">London Eye</div>
+          </div>
+        </div>
+
+        <!-- Image gallery: 1 hero + 2 stacked -->
+        <div class="image-gallery">
+          <div class="img-hero">
+            <img id="img-detail-le-standard-hero" alt="London Eye hero" src=""
+                 onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+            <div class="placeholder">Hero image</div>
+          </div>
+          <div class="img-side-stack">
+            <div class="img-side">
+              <img id="img-detail-le-standard-2" alt="" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+              <div class="placeholder">Image 2</div>
+            </div>
+            <div class="img-side">
+              <img id="img-detail-le-standard-3" alt="" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+              <div class="placeholder">Image 3</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info card -->
+        <div class="detail-info">
+          <h3 class="info-heading">General Information</h3>
+          <p class="info-text">Lorem ipsum dolor sit amet consectetur. Lacinia aliquet sit vel congue vivamus scelerisque vitae consectetur donec. Magnis id luctus scelerisque mauris. Vitae nec nullam mi fermentum. Viverra aliquam mauris tortor facilisis ultricies luctus eget.</p>
+          <p class="info-text"><span class="info-emphasis">⭐ London Eye </span>Lorem ipsum dolor sit amet consectetur. Lacinia aliquet sit vel congue vivamus scelerisque vitae consectetur donec. Magnis id luctus scelerisque mauris. Vitae nec nullam mi fermentum. Viverra aliquam mauris tortor facilisis ultricies luctus eget.</p>
+          <h3 class="info-heading">How to get there</h3>
+          <p class="info-text">Lorem ipsum dolor sit amet consectetur. Lacinia aliquet sit vel congue vivamus scelerisque vitae consectetur donec. Magnis id luctus scelerisque mauris. Vitae nec nullam mi fermentum. Viverra aliquam mauris tortor facilisis ultricies luctus eget.</p>
+        </div>
+
+      </div>
+
+      <!-- Footer with Back + Buy tickets -->
+      <div class="bottom-bar footer-bar">
+        <button class="btn-secondary" id="btnDetailBack">Back</button>
+        <button class="btn-primary" id="btnBuyTickets">Buy tickets</button>
+      </div>
+    </div>
+
+    <!-- =================================================================
+         PAGE: BUY TICKETS — date & hour, tickets, extras
+    ================================================================== -->
+    <div class="page page-ticket-buy">
+      <div class="scroll-area scroll-area--buy">
+
+        <!-- Header card with title -->
+        <div class="card buy-header-card detail-header-card">
+          <div class="header">
+            <div class="header-logo">
+              <img id="img-brand-logo-3" alt="London Eye logo" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+            </div>
+
+            <button class="btn-icon-round" id="btnBuyHome" aria-label="Home">
+              <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4.5 15.5 L18 5 L31.5 15.5 V30 a2 2 0 0 1 -2 2 H22.5 V21 H13.5 V32 H6.5 a2 2 0 0 1 -2 -2 Z"
+                      fill="#031419"/>
+              </svg>
+            </button>
+
+            <div class="lang-pill">
+              <img id="img-lang-flag-3" class="flag" alt="UK flag" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+              <div class="label">English</div>
+              <div class="chevron"></div>
+            </div>
+          </div>
+
+          <div class="detail-title-block">
+            <h1>Standard tickets</h1>
+            <div class="subtitle">London Eye | Tickets</div>
+          </div>
+        </div>
+
+        <!-- COMBINED CARD: DATE & HOUR + CHOOSE YOUR TICKETS -->
+        <div class="buy-card buy-card--combined">
+
+          <!-- Date & hour -->
+          <div class="combined-section">
+            <div class="combined-section-title">Date &amp; hour</div>
+            <div class="date-row" id="dateRow"></div>
+            <div class="time-pill-row" id="timeSlotRow"></div>
+          </div>
+
+          <!-- Choose your tickets (tickets + extras combined) -->
+          <div class="combined-section">
+            <div class="combined-section-title">Choose your tickets</div>
+            <div class="stepper-list">
+
+              <!-- Adult -->
+              <div class="stepper-row" data-row-id="adult" data-selected="true">
+                <div class="stepper-info">
+                  <div class="row-title">Adult (16+)</div>
+                  <div class="row-add-line">
+                    <span class="row-add-label">Add for</span>
+                    <span class="row-price">£33.00</span>
+                  </div>
+                </div>
+                <div class="stepper-action">
+                  <div class="stepper-controls">
+                    <button class="stepper-btn stepper-minus" data-row="adult" aria-label="Decrease">
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/></svg>
+                    </button>
+                    <div class="stepper-count" data-count="adult">1</div>
+                    <button class="stepper-btn stepper-plus" data-row="adult" aria-label="Increase">
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/><rect x="12" y="5" width="2" height="16" fill="currentColor"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Child -->
+              <div class="stepper-row" data-row-id="child" data-selected="false">
+                <div class="stepper-info">
+                  <div class="row-title">Child (2 - 15 Years)</div>
+                  <div class="row-add-line">
+                    <span class="row-add-label">Add for</span>
+                    <span class="row-price">£30.00</span>
+                  </div>
+                </div>
+                <div class="stepper-action">
+                  <div class="stepper-controls">
+                    <button class="stepper-btn stepper-minus" data-row="child" aria-label="Decrease" disabled>
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/></svg>
+                    </button>
+                    <div class="stepper-count" data-count="child">0</div>
+                    <button class="stepper-btn stepper-plus" data-row="child" aria-label="Increase">
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/><rect x="12" y="5" width="2" height="16" fill="currentColor"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Under 2 -->
+              <div class="stepper-row" data-row-id="under2" data-selected="false">
+                <div class="stepper-info">
+                  <div class="row-title">Under 2</div>
+                  <div class="row-add-line">
+                    <span class="row-add-label">Add for</span>
+                    <span class="row-price">£0.00</span>
+                  </div>
+                </div>
+                <div class="stepper-action">
+                  <div class="stepper-controls">
+                    <button class="stepper-btn stepper-minus" data-row="under2" aria-label="Decrease" disabled>
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/></svg>
+                    </button>
+                    <div class="stepper-count" data-count="under2">0</div>
+                    <button class="stepper-btn stepper-plus" data-row="under2" aria-label="Increase">
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/><rect x="12" y="5" width="2" height="16" fill="currentColor"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Carer -->
+              <div class="stepper-row" data-row-id="carer" data-selected="false">
+                <div class="stepper-info">
+                  <div class="row-title">Carer</div>
+                  <div class="row-add-line">
+                    <span class="row-add-label">Add for</span>
+                    <span class="row-price">£0.00</span>
+                  </div>
+                </div>
+                <div class="stepper-action">
+                  <div class="stepper-controls">
+                    <button class="stepper-btn stepper-minus" data-row="carer" aria-label="Decrease" disabled>
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/></svg>
+                    </button>
+                    <div class="stepper-count" data-count="carer">0</div>
+                    <button class="stepper-btn stepper-plus" data-row="carer" aria-label="Increase">
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/><rect x="12" y="5" width="2" height="16" fill="currentColor"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- River cruise -->
+              <div class="stepper-row extras-row" data-row-id="river" data-selected="false">
+                <div class="stepper-info">
+                  <div class="extras-text-block">
+                    <div class="row-title-with-icon">
+                      <div class="row-icon">
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="1.5" fill="#536B75"/><circle cx="11" cy="5" r="1.5" fill="#536B75"/><circle cx="5" cy="11" r="1.5" fill="#536B75"/><circle cx="11" cy="11" r="1.5" fill="#536B75"/></svg>
+                      </div>
+                      <div class="row-title">River cruise</div>
+                    </div>
+                    <div class="row-add-line">
+                      <span class="row-add-label">Add for</span>
+                      <span class="row-price">£15.00</span>
+                    </div>
+                    <div class="row-description">Sail along the Thames and enjoy unique views of London's iconic riverside landmarks.</div>
+                  </div>
+                </div>
+                <div class="stepper-action">
+                  <div class="stepper-controls">
+                    <button class="stepper-btn stepper-minus" data-row="river" aria-label="Decrease" disabled>
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/></svg>
+                    </button>
+                    <div class="stepper-count" data-count="river">0</div>
+                    <button class="stepper-btn stepper-plus" data-row="river" aria-label="Increase">
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/><rect x="12" y="5" width="2" height="16" fill="currentColor"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mini-Binoculars -->
+              <div class="stepper-row extras-row" data-row-id="binoculars" data-selected="false">
+                <div class="stepper-info">
+                  <div class="extras-text-block">
+                    <div class="row-title-with-icon">
+                      <div class="row-icon">
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="1.5" fill="#536B75"/><circle cx="11" cy="5" r="1.5" fill="#536B75"/><circle cx="5" cy="11" r="1.5" fill="#536B75"/><circle cx="11" cy="11" r="1.5" fill="#536B75"/></svg>
+                      </div>
+                      <div class="row-title">Mini-Binoculars</div>
+                    </div>
+                    <div class="row-add-line">
+                      <span class="row-add-label">Add for</span>
+                      <span class="row-strike">£6.00</span>
+                      <span class="row-price">£5.00</span>
+                    </div>
+                    <div class="row-description">Zoom in on the city's highlights</div>
+                  </div>
+                </div>
+                <div class="stepper-action">
+                  <div class="stepper-controls">
+                    <button class="stepper-btn stepper-minus" data-row="binoculars" aria-label="Decrease" disabled>
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/></svg>
+                    </button>
+                    <div class="stepper-count" data-count="binoculars">0</div>
+                    <button class="stepper-btn stepper-plus" data-row="binoculars" aria-label="Increase">
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/><rect x="12" y="5" width="2" height="16" fill="currentColor"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Champagne -->
+              <div class="stepper-row extras-row" data-row-id="champagne" data-selected="false">
+                <div class="stepper-info">
+                  <div class="extras-text-block">
+                    <div class="row-title-with-icon">
+                      <div class="row-icon">
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="1.5" fill="#536B75"/><circle cx="11" cy="5" r="1.5" fill="#536B75"/><circle cx="5" cy="11" r="1.5" fill="#536B75"/><circle cx="11" cy="11" r="1.5" fill="#536B75"/></svg>
+                      </div>
+                      <div class="row-title">Glass of Champagne in the Eye Lounge</div>
+                    </div>
+                    <div class="row-add-line">
+                      <span class="row-add-label">Add for</span>
+                      <span class="row-strike">£21.00</span>
+                      <span class="row-price">£18.00</span>
+                    </div>
+                    <div class="row-description">Enjoy a glass of champagne before your flight</div>
+                  </div>
+                </div>
+                <div class="stepper-action">
+                  <div class="stepper-controls">
+                    <button class="stepper-btn stepper-minus" data-row="champagne" aria-label="Decrease" disabled>
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/></svg>
+                    </button>
+                    <div class="stepper-count" data-count="champagne">0</div>
+                    <button class="stepper-btn stepper-plus" data-row="champagne" aria-label="Increase">
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/><rect x="12" y="5" width="2" height="16" fill="currentColor"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Premium Photo Package -->
+              <div class="stepper-row extras-row" data-row-id="photo" data-selected="false">
+                <div class="stepper-info">
+                  <div class="extras-text-block">
+                    <div class="row-title-with-icon">
+                      <div class="row-icon">
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="1.5" fill="#536B75"/><circle cx="11" cy="5" r="1.5" fill="#536B75"/><circle cx="5" cy="11" r="1.5" fill="#536B75"/><circle cx="11" cy="11" r="1.5" fill="#536B75"/></svg>
+                      </div>
+                      <div class="row-title">Premium Photo Package</div>
+                    </div>
+                    <div class="row-add-line">
+                      <span class="row-add-label">Add for</span>
+                      <span class="row-strike">£28.00</span>
+                      <span class="row-price">£25.00</span>
+                    </div>
+                    <div class="row-description">Make your moment unforgettable</div>
+                  </div>
+                </div>
+                <div class="stepper-action">
+                  <div class="stepper-controls">
+                    <button class="stepper-btn stepper-minus" data-row="photo" aria-label="Decrease" disabled>
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/></svg>
+                    </button>
+                    <div class="stepper-count" data-count="photo">0</div>
+                    <button class="stepper-btn stepper-plus" data-row="photo" aria-label="Increase">
+                      <svg viewBox="0 0 26 26"><rect x="5" y="12" width="16" height="2" fill="currentColor"/><rect x="12" y="5" width="2" height="16" fill="currentColor"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer with Back + Continue -->
+      <div class="bottom-bar footer-bar">
+        <button class="btn-secondary" id="btnBuyBack">Back</button>
+        <button class="btn-primary" id="btnContinue">Continue</button>
+      </div>
+
+    </div>
+
+    <!-- =================================================================
+         PAGE: CHECKOUT — purchase details + contact form
+    ================================================================== -->
+    <div class="page page-checkout">
+      <div class="scroll-area scroll-area--checkout">
+
+        <!-- Header card -->
+        <div class="card buy-header-card detail-header-card">
+          <div class="header">
+            <div class="header-logo">
+              <img id="img-brand-logo-4" alt="London Eye logo" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+            </div>
+            <button class="btn-icon-round" id="btnCheckoutHome" aria-label="Home">
+              <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4.5 15.5 L18 5 L31.5 15.5 V30 a2 2 0 0 1 -2 2 H22.5 V21 H13.5 V32 H6.5 a2 2 0 0 1 -2 -2 Z"
+                      fill="#031419"/>
+              </svg>
+            </button>
+            <div class="lang-pill">
+              <img id="img-lang-flag-4" class="flag" alt="UK flag" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+              <div class="label">English</div>
+              <div class="chevron"></div>
+            </div>
+          </div>
+          <div class="detail-title-block">
+            <h1 id="checkoutTitle">Standard tickets</h1>
+            <div class="subtitle" id="checkoutSubtitle">London Eye | Checkout</div>
+          </div>
+        </div>
+
+        <!-- Purchase details card -->
+        <div class="checkout-card">
+          <div class="checkout-section-title">Purchase details</div>
+
+          <div class="checkout-block">
+            <div class="checkout-block-title" id="checkoutSection">London Eye</div>
+            <div class="checkout-info-row">
+              <span class="icon-img-wrap">
+                <img class="icon-img" data-icon="calendar" alt="" />
+                <span class="icon-fb">
+                  <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4" y="6" width="24" height="22" rx="2" stroke="#06232C" stroke-width="2"/>
+                    <path d="M4 12 H28" stroke="#06232C" stroke-width="2"/>
+                    <path d="M10 2 V8" stroke="#06232C" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M22 2 V8" stroke="#06232C" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </span>
+              </span>
+              <span id="checkoutDateTime">Thu 4 Apr - 10:00 AM</span>
+            </div>
+            <div class="checkout-info-row">
+              <span class="icon-img-wrap">
+                <img class="icon-img" data-icon="pin" alt="" />
+                <span class="icon-fb">
+                  <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M16 2 C10 2 6 6 6 12 c0 7 10 18 10 18 s10-11 10-18 c0-6-4-10-10-10 z" stroke="#06232C" stroke-width="2" fill="none"/>
+                    <circle cx="16" cy="12" r="3.5" stroke="#06232C" stroke-width="2" fill="none"/>
+                  </svg>
+                </span>
+              </span>
+              <span>Riverside Building, County Hall, Westminster Bridge Rd, London SE1 7PB, United Kingdom</span>
+            </div>
+          </div>
+
+          <div class="checkout-divider" id="checkoutOtherDivider1"></div>
+
+          <!-- Other experiences (conditional) -->
+          <div class="checkout-block" id="checkoutOtherSection">
+            <div class="checkout-block-title">Other experiences</div>
+            <div class="checkout-info-row">
+              <span class="icon-img-wrap">
+                <img class="icon-img" data-icon="calendar" alt="" />
+                <span class="icon-fb">
+                  <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4" y="6" width="24" height="22" rx="2" stroke="#06232C" stroke-width="2"/>
+                    <path d="M4 12 H28" stroke="#06232C" stroke-width="2"/>
+                    <path d="M10 2 V8" stroke="#06232C" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M22 2 V8" stroke="#06232C" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </span>
+              </span>
+              <span>After purchase, you have <b>90 days</b> to book additional tickets</span>
+            </div>
+          </div>
+
+          <div class="checkout-divider" id="checkoutOtherDivider2"></div>
+
+          <div class="checkout-line-items" id="checkoutLineItems"></div>
+
+          <div class="checkout-divider"></div>
+
+          <div class="coupon-row">
+            <input class="coupon-input" type="text" placeholder="Add coupon" id="couponInput" />
+            <button class="btn-coupon-apply" disabled>Apply</button>
+          </div>
+
+          <div class="checkout-summary">
+            <div class="checkout-tax-line">
+              <span>Tax included</span>
+              <span id="checkoutTax">£0.00</span>
+            </div>
+            <div class="checkout-total-line">
+              <span class="label">Total</span>
+              <span class="amount" id="checkoutTotal">£0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact info card -->
+        <div class="checkout-card">
+          <div class="checkout-section-title">Contact information</div>
+          <div class="contact-info-banner">
+            <div class="heading">
+              <span class="info-icon">i</span>
+              Adding your email: optional, but convenient
+            </div>
+            <div class="body">A QR code to manage your visit will be printed on your receipt, but if you lose it, your email is your backup to access your tickets and manage your experiences.</div>
+          </div>
+          <input class="contact-input" type="email" placeholder="Email" />
+          <input class="contact-input" type="text"  placeholder="Name" />
+          <input class="contact-input" type="text"  placeholder="Last name" />
+
+          <div class="consent-row" id="consentRow" data-checked="true">
+            <div class="checkbox"></div>
+            <div class="text">I accept to be contacted for operational matters, to be provided with access to digital tickets via the Fever app, and to receive a satisfaction survey after the event.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer with Back + Pay -->
+      <div class="bottom-bar footer-bar">
+        <button class="btn-secondary" id="btnCheckoutBack">Back</button>
+        <button class="btn-primary" id="btnPay">Pay</button>
+      </div>
+    </div>
+
+    <!-- =================================================================
+         PAGE: PAYMENT METHOD — pinpad illustration & caption
+    ================================================================== -->
+    <div class="page page-payment-method">
+      <div class="scroll-area scroll-area--payment">
+
+        <!-- Header card -->
+        <div class="card buy-header-card detail-header-card">
+          <div class="header">
+            <div class="header-logo">
+              <img id="img-brand-logo-5" alt="London Eye logo" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+            </div>
+            <button class="btn-icon-round" id="btnPaymentHome" aria-label="Home">
+              <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4.5 15.5 L18 5 L31.5 15.5 V30 a2 2 0 0 1 -2 2 H22.5 V21 H13.5 V32 H6.5 a2 2 0 0 1 -2 -2 Z"
+                      fill="#031419"/>
+              </svg>
+            </button>
+            <div class="lang-pill">
+              <img id="img-lang-flag-5" class="flag" alt="UK flag" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+              <div class="label">English</div>
+              <div class="chevron"></div>
+            </div>
+          </div>
+          <div class="detail-title-block">
+            <h1 id="paymentTitle">Standard tickets</h1>
+            <div class="subtitle" id="paymentSubtitle">London Eye | Payment Method</div>
+          </div>
+        </div>
+
+        <!-- Body card with the pinpad illustration -->
+        <div class="payment-card">
+          <button class="payment-pinpad" id="btnPinpad" aria-label="Continue payment">
+            <img class="pinpad-img" data-icon-img-only="true" id="img-payment-pinpad" alt=""
+                 onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+            <span class="pinpad-fallback">
+              <!-- Inline SVG fallback if no icon-pinpad.png is uploaded -->
+              <svg viewBox="0 0 220 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- card sticking out -->
+                <g transform="rotate(-12 100 30)">
+                  <rect x="42" y="6" width="120" height="60" rx="5" fill="#fff" stroke="#06232C" stroke-width="2.5"/>
+                  <rect x="42" y="22" width="120" height="10" fill="#06232C"/>
+                  <rect x="52" y="46" width="46" height="12" rx="2" fill="#06232C"/>
+                </g>
+                <!-- "tap" waves to the right -->
+                <path d="M168 60 q12 -10 0 -22"  stroke="#06232C" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+                <path d="M178 70 q22 -18 0 -42" stroke="#06232C" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+                <!-- pinpad body -->
+                <rect x="48" y="82" width="124" height="166" rx="8" fill="#fff" stroke="#06232C" stroke-width="2.5"/>
+                <!-- screen -->
+                <rect x="62" y="98" width="96" height="58" rx="4" fill="#fff" stroke="#06232C" stroke-width="2"/>
+                <!-- green check -->
+                <path d="M88 128 l10 10 l24 -22" stroke="#24A865" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- keypad -->
+                <circle cx="78"  cy="178" r="5" fill="none" stroke="#06232C" stroke-width="2"/>
+                <circle cx="110" cy="178" r="5" fill="none" stroke="#06232C" stroke-width="2"/>
+                <circle cx="142" cy="178" r="5" fill="none" stroke="#06232C" stroke-width="2"/>
+                <circle cx="78"  cy="200" r="5" fill="none" stroke="#06232C" stroke-width="2"/>
+                <circle cx="110" cy="200" r="5" fill="none" stroke="#06232C" stroke-width="2"/>
+                <circle cx="142" cy="200" r="5" fill="none" stroke="#06232C" stroke-width="2"/>
+                <circle cx="78"  cy="222" r="5" fill="none" stroke="#06232C" stroke-width="2"/>
+                <circle cx="110" cy="222" r="5" fill="none" stroke="#06232C" stroke-width="2"/>
+                <circle cx="142" cy="222" r="5" fill="none" stroke="#06232C" stroke-width="2"/>
+              </svg>
+            </span>
+          </button>
+          <div class="payment-caption">
+            Please follow the instructions on the pinpad display to complete the payment
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer with Back only -->
+      <div class="bottom-bar footer-bar footer-bar--single">
+        <button class="btn-secondary btn-secondary--full" id="btnPaymentBack">Back</button>
+      </div>
+    </div>
+
+    <!-- =================================================================
+         PAGE: ORDER / SUCCESS — confirmation after the payment is taken
+    ================================================================== -->
+    <div class="page page-order">
+      <div class="scroll-area scroll-area--order">
+
+        <!-- Header card -->
+        <div class="card buy-header-card detail-header-card">
+          <div class="header">
+            <div class="header-logo">
+              <img id="img-brand-logo-6" alt="London Eye logo" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+            </div>
+            <button class="btn-icon-round" id="btnOrderHome" aria-label="Home">
+              <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4.5 15.5 L18 5 L31.5 15.5 V30 a2 2 0 0 1 -2 2 H22.5 V21 H13.5 V32 H6.5 a2 2 0 0 1 -2 -2 Z"
+                      fill="#031419"/>
+              </svg>
+            </button>
+            <div class="lang-pill">
+              <img id="img-lang-flag-6" class="flag" alt="UK flag" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+              <div class="label">English</div>
+              <div class="chevron"></div>
+            </div>
+          </div>
+          <div class="detail-title-block">
+            <h1 id="orderTitle">London Eye | Standard ticket</h1>
+            <div class="subtitle" id="orderSubtitle">London Eye | Your order</div>
+          </div>
+        </div>
+
+        <!-- Order success card -->
+        <div class="order-card">
+          <div class="order-success-block">
+            <div class="order-check-icon">
+              <div class="inner">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7 16 l6 6 l12 -12" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+            <div class="order-thanks">Thanks for your payment</div>
+            <div class="order-collect">Don't forget to collect your tickets!</div>
+            <div class="order-id-row">
+              <span class="label">Order ID</span>
+              <span class="value" id="orderIdValue">000000000</span>
+            </div>
+          </div>
+
+          <div class="order-divider"></div>
+
+          <div class="order-manage-block">
+            <div class="order-manage-title">Manage your tickets by</div>
+
+            <div class="order-manage-line">
+              <span class="icon-img-wrap">
+                <img class="icon-img" data-icon="qr" alt="" />
+                <span class="icon-fb">
+                  <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3"  y="3"  width="10" height="10" stroke="#2C4751" stroke-width="2"/>
+                    <rect x="6"  y="6"  width="4"  height="4"  fill="#2C4751"/>
+                    <rect x="19" y="3"  width="10" height="10" stroke="#2C4751" stroke-width="2"/>
+                    <rect x="22" y="6"  width="4"  height="4"  fill="#2C4751"/>
+                    <rect x="3"  y="19" width="10" height="10" stroke="#2C4751" stroke-width="2"/>
+                    <rect x="6"  y="22" width="4"  height="4"  fill="#2C4751"/>
+                    <rect x="17" y="17" width="3"  height="3"  fill="#2C4751"/>
+                    <rect x="22" y="17" width="3"  height="3"  fill="#2C4751"/>
+                    <rect x="17" y="22" width="3"  height="3"  fill="#2C4751"/>
+                    <rect x="26" y="22" width="3"  height="3"  fill="#2C4751"/>
+                    <rect x="22" y="27" width="3"  height="2"  fill="#2C4751"/>
+                  </svg>
+                </span>
+              </span>
+              <span>Scanning the <b>QR code</b> on the printed ticket</span>
+            </div>
+
+            <div class="order-manage-line">
+              <span class="icon-img-wrap">
+                <img class="icon-img" data-icon="globe" alt="" />
+                <span class="icon-fb">
+                  <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="16" cy="16" r="13" stroke="#2C4751" stroke-width="2"/>
+                    <ellipse cx="16" cy="16" rx="6" ry="13" stroke="#2C4751" stroke-width="2" fill="none"/>
+                    <path d="M3 16 H29" stroke="#2C4751" stroke-width="2"/>
+                  </svg>
+                </span>
+              </span>
+              <span>Following the instructions on your <b>confirmation email</b></span>
+            </div>
+
+            <div class="order-manage-line">
+              <span class="icon-img-wrap">
+                <img class="icon-img" data-icon="cashier" alt="" />
+                <span class="icon-fb">
+                  <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4"  y="10" width="24" height="18" rx="2" stroke="#2C4751" stroke-width="2" fill="none"/>
+                    <rect x="8"  y="14" width="16" height="4"  stroke="#2C4751" stroke-width="2" fill="none"/>
+                    <rect x="9"  y="20" width="3"  height="3"  fill="#2C4751"/>
+                    <rect x="14" y="20" width="3"  height="3"  fill="#2C4751"/>
+                    <rect x="19" y="20" width="3"  height="3"  fill="#2C4751"/>
+                    <rect x="9"  y="24" width="3"  height="2"  fill="#2C4751"/>
+                    <rect x="14" y="24" width="3"  height="2"  fill="#2C4751"/>
+                    <rect x="19" y="24" width="3"  height="2"  fill="#2C4751"/>
+                    <path d="M10 4 H22 V10 H10 Z" stroke="#2C4751" stroke-width="2" fill="none"/>
+                  </svg>
+                </span>
+              </span>
+              <span>Visiting any <b>cashier</b></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer with single Finish button (full width, primary) -->
+      <div class="bottom-bar footer-bar footer-bar--single">
+        <button class="btn-primary" id="btnFinish">Finish</button>
+      </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL: "Add more to your visit" — sibling of all pages,
+         so it can overlay whichever page is active.
+    ========================================================== -->
+    <div class="modal-overlay" id="addMoreModal" aria-hidden="true">
+        <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="addMoreTitle">
+
+          <div class="modal-header">
+            <div class="modal-header-spacer"></div>
+            <div class="modal-header-title" id="addMoreTitle">Add more to your visit</div>
+            <button class="modal-icon-btn" id="btnCloseAddMore" aria-label="Close">
+              <span class="icon-img-wrap">
+                <img class="icon-img" data-icon="close" alt="" />
+                <span class="icon-fb">
+                  <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 3 L15 15 M15 3 L3 15" stroke="#031419" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <div class="modal-body">
+
+            <div class="modal-image">
+              <img id="img-modal-addmore-hero" alt="Madame Tussauds" src=""
+                   onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" />
+              <div class="placeholder">Madame Tussauds image</div>
+            </div>
+
+            <div class="modal-text">
+              <div class="modal-title-row">
+                <div class="modal-title">Madame Tussauds</div>
+                <div class="modal-discount-badge">
+                  <span class="icon-img-wrap">
+                    <img class="icon-img" data-icon="discount" alt="" />
+                    <span class="icon-fb">
+                      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="9" cy="9" r="7" stroke="white" stroke-width="1.6"/>
+                        <path d="M5.5 12 L12 5.5" stroke="white" stroke-width="1.6" stroke-linecap="round"/>
+                        <circle cx="6.7" cy="6.7" r="1.1" fill="white"/>
+                        <circle cx="11.3" cy="11.3" r="1.1" fill="white"/>
+                      </svg>
+                    </span>
+                  </span>
+                  <span id="addMoreOff">75% off</span>
+                </div>
+              </div>
+              <div class="modal-description">
+                Step into immersive sets and come face-to-face with incredibly lifelike celebrities.
+              </div>
+            </div>
+
+            <div class="modal-info-list">
+              <div class="modal-info-row">
+                <span class="icon-img-wrap">
+                  <img class="icon-img" data-icon="calendar" alt="" />
+                  <span class="icon-fb">
+                    <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="3.5" y="5" width="19" height="17" rx="2" stroke="#1A1A1A" stroke-width="1.6"/>
+                      <path d="M3.5 10 H22.5" stroke="#1A1A1A" stroke-width="1.6"/>
+                      <path d="M8 2 V7" stroke="#1A1A1A" stroke-width="1.6" stroke-linecap="round"/>
+                      <path d="M18 2 V7" stroke="#1A1A1A" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>
+                  </span>
+                </span>
+                <span>Schedule within <b>90 days</b> of purchase</span>
+              </div>
+              <div class="modal-info-row">
+                <span class="icon-img-wrap">
+                  <img class="icon-img" data-icon="ticket" alt="" />
+                  <span class="icon-fb">
+                    <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 8 H23 V12 a2 2 0 0 0 0 4 V20 H3 V16 a2 2 0 0 0 0 -4 Z" stroke="#1A1A1A" stroke-width="1.6" fill="none"/>
+                      <path d="M10 9 V19" stroke="#1A1A1A" stroke-width="1.6" stroke-dasharray="2 2"/>
+                    </svg>
+                  </span>
+                </span>
+                <span>Price for <b id="addMorePeople">1 person</b></span>
+              </div>
+            </div>
+
+            <div class="modal-actions">
+              <button class="btn-modal-secondary" id="btnAddMoreAdd">
+                <span>Add - </span>
+                <span class="strike" id="addMoreStrike">£40.00</span>
+                <span> </span>
+                <span id="addMorePrice">£10.00</span>
+              </button>
+              <button class="btn-modal-primary" id="btnAddMoreContinue">Continue to payment</button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+  </div>
+</div>
+
+<script>
+  /* ------------------------------------------------------------------
+     IMAGE PATHS
+     ------------------------------------------------------------------
+     All images live in the SAME folder as this HTML on GitHub. Adjust
+     filenames here if yours differ. Each <img> falls back to a
+     labelled placeholder if the file is missing.
+  ------------------------------------------------------------------- */
+  const IMAGES = {
+    'img-brand-logo':              'London EYe logo.png',
+    'img-brand-logo-2':            'London EYe logo.png',
+    'img-brand-logo-3':            'London EYe logo.png',
+    'img-brand-logo-4':            'London EYe logo.png',
+    'img-brand-logo-5':            'London EYe logo.png',
+    'img-brand-logo-6':            'London EYe logo.png',
+    'img-lang-flag':               'flag-uk.png',
+    'img-lang-flag-2':             'flag-uk.png',
+    'img-lang-flag-3':             'flag-uk.png',
+    'img-lang-flag-4':             'flag-uk.png',
+    'img-lang-flag-5':             'flag-uk.png',
+    'img-lang-flag-6':             'flag-uk.png',
+
+    'img-london-eye-standard':     'London Eye | Standard Ticket.png',
+    'img-london-eye-fasttrack':    'London Eye | Fast Track Ticket.png',
+    'img-london-eye-rivercruise':  'London Eye + River Cruise.png',
+    'img-london-eye-champagne':    'London Eye hosted Champagne experience.png',
+
+    'img-multi-tussauds':          'London Eye + Madame Tussauds.png',
+    'img-multi-tussauds-sealife':  'London Eye + Madame Tussauds + Sea Life Aquarium.png',
+    'img-multi-five':              'London eye + Madame Tussands + Shrek’s adventure + London Dungeon + Sea life London aquarium.png',
+
+    'img-single-sealife':          'Sea life | Standard ticket.png',
+    'img-single-tussauds':         'Madame Tussauds | Standard ticket.png',
+    'img-single-dungeon':          'London Dungeon | Standard entry.png',
+
+    /* Detail page: London Eye | Standard ticket */
+    'img-detail-le-standard-hero': 'Hero1.png',
+    'img-detail-le-standard-2':    'Hero2.png',
+    'img-detail-le-standard-3':    'Hero3.png',
+
+    /* "Add more to your visit" modal hero */
+    'img-modal-addmore-hero':      'Madame Tussauds | Standard ticket.png',
+
+    /* Payment-method page pinpad illustration (optional — falls back
+       to an inline SVG if this file is missing). */
+    'img-payment-pinpad':          'pinpad-illustration.png',
+  };
+
+  /* ICON FILES — drop your PNGs/SVGs at the same level as kiosk.html
+     using the filenames below and they will be applied automatically.
+     Each <img class="icon-img" data-icon="X"> in the markup gets the
+     matching path; if the file is missing, the inline SVG fallback in
+     the next sibling element shows instead. */
+  const ICONS = {
+    'home':         'icon-home.png',
+    'close':        'icon-close.png',
+    'chevron-down': 'icon-chevron-down.png',
+    'calendar':     'icon-calendar.png',
+    'ticket':       'icon-ticket.png',
+    'discount':     'icon-discount.png',
+    'people':       'icon-people.png',
+    'star':         'icon-star.png',
+    'plus':         'icon-plus.png',
+    'minus':        'icon-minus.png',
+    'more-dates':   'icon-more-dates.png',
+    'pin':          'icon-pin.png',
+    'pinpad':       'icon-pinpad.png',
+    'check':        'icon-check.png',
+    'qr':           'icon-qr.png',
+    'globe':        'icon-globe.png',
+    'cashier':      'icon-cashier.png',
+  };
+
+  Object.entries(IMAGES).forEach(([id, src]) => {
+    if (!src) return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    // Reset any inline display style that may have been set by the
+    // initial onerror (fired by the empty src="" at parse time) so the
+    // real image can render once it loads.
+    el.style.display = '';
+    el.src = src;
+  });
+
+  // Apply icon paths. If no path is mapped OR the file fails to load,
+  // hide the img and reveal the next-sibling .icon-fb (inline SVG fallback).
+  document.querySelectorAll('img.icon-img[data-icon]').forEach(img => {
+    const fb = img.nextElementSibling;
+    const useFallback = () => {
+      img.style.display = 'none';
+      if (fb && fb.classList && fb.classList.contains('icon-fb')) {
+        fb.style.display = 'inline-flex';
+      }
+    };
+    const path = ICONS[img.dataset.icon];
+    if (!path) {
+      useFallback();
+      return;
+    }
+    img.onerror = useFallback;
+    img.src = path;
+  });
+
+  /* ------------------------------------------------------------------
+     NAVIGATION
+     ------------------------------------------------------------------
+     - data-page on .kiosk-frame chooses which page is visible.
+     - data-view on .kiosk-frame is only meaningful inside page-home;
+       it controls the home / london-eye-expanded sub-state.
+     - returnState remembers where Back should return to from a detail.
+  ------------------------------------------------------------------- */
+  const frame   = document.getElementById('kioskFrame');
+  const homeScroll = document.getElementById('homeScroll');
+
+  let returnState = { page: 'home', view: 'home' };
+  const FADE_MS = 320;
+  let removeTimer = null;
+
+  function setView(view) {
+    const sections = document.querySelectorAll('.section-collapse');
+    if (removeTimer) { clearTimeout(removeTimer); removeTimer = null; }
+
+    if (view === 'london-eye') {
+      sections.forEach(s => s.classList.remove('is-removed'));
+      void homeScroll.offsetHeight;
+      frame.dataset.view = 'london-eye';
+      removeTimer = setTimeout(() => {
+        if (frame.dataset.view === 'london-eye') {
+          sections.forEach(s => s.classList.add('is-removed'));
+        }
+      }, FADE_MS);
+    } else {
+      sections.forEach(s => s.classList.remove('is-removed'));
+      void homeScroll.offsetHeight;
+      frame.dataset.view = 'home';
+    }
+
+    homeScroll.scrollTop = 0;
+  }
+
+  function setPage(page) {
+    frame.dataset.page = page;
+    // Each page has its own scroll-area; reset its scrollTop on entry.
+    const newPageEl = document.querySelector(`.page-${page} .scroll-area`);
+    if (newPageEl) newPageEl.scrollTop = 0;
+  }
+
+  function navigateToTicket(ticketId) {
+    // Remember where to return to (which page + view) before leaving.
+    returnState = {
+      page: frame.dataset.page,
+      view: frame.dataset.view,
+    };
+    setPage('ticket-' + ticketId);
+  }
+
+  function navigateBack() {
+    const { page, view } = returnState;
+    setPage(page);
+    // Restore the home page sub-view (home or london-eye expanded)
+    if (page === 'home') frame.dataset.view = view || 'home';
+  }
+
+  function navigateHome() {
+    setPage('home');
+    setView('home');
+    returnState = { page: 'home', view: 'home' };
+  }
+
+  /* Wire up controls */
+  document.getElementById('btnShowAllLondonEye')
+          .addEventListener('click', () => setView('london-eye'));
+  document.getElementById('btnBack')
+          .addEventListener('click', () => setView('home'));
+  document.getElementById('btnDetailBack')
+          .addEventListener('click', navigateBack);
+  document.getElementById('btnHome')
+          .addEventListener('click', navigateHome);
+  document.getElementById('btnBuyTickets')
+          .addEventListener('click', () => {
+            // Remember to return to the detail page from the buy page
+            returnState = {
+              page: frame.dataset.page,
+              view: frame.dataset.view,
+            };
+            setPage('ticket-buy');
+            // Re-render dates/times so today / next-available are fresh.
+            initBuyPage();
+          });
+  document.getElementById('btnBuyBack')
+          .addEventListener('click', navigateBack);
+  document.getElementById('btnBuyHome')
+          .addEventListener('click', navigateHome);
+  document.getElementById('btnContinue')
+          .addEventListener('click', () => {
+            updateAddMoreModal();
+            openAddMoreModal();
+          });
+  document.getElementById('btnCloseAddMore')
+          .addEventListener('click', closeAddMoreModal);
+  document.getElementById('btnAddMoreAdd')
+          .addEventListener('click', () => {
+            // User accepted the Madame Tussauds upsell.
+            state.addMTUpsell = true;
+            closeAddMoreModal();
+            renderCheckout();
+            setPage('checkout');
+          });
+  document.getElementById('btnAddMoreContinue')
+          .addEventListener('click', () => {
+            // User skipped the upsell and goes straight to payment.
+            state.addMTUpsell = false;
+            closeAddMoreModal();
+            renderCheckout();
+            setPage('checkout');
+          });
+  document.getElementById('btnCheckoutBack')
+          .addEventListener('click', () => {
+            setPage('ticket-buy');
+          });
+  document.getElementById('btnCheckoutHome')
+          .addEventListener('click', navigateHome);
+  document.getElementById('btnPay')
+          .addEventListener('click', () => {
+            renderPayment();
+            setPage('payment-method');
+          });
+  document.getElementById('btnPaymentBack')
+          .addEventListener('click', () => {
+            setPage('checkout');
+          });
+  document.getElementById('btnPaymentHome')
+          .addEventListener('click', navigateHome);
+  document.getElementById('btnPinpad')
+          .addEventListener('click', () => {
+            // Simulates a confirmed payment — generate an order ID and
+            // jump to the success page.
+            renderOrder();
+            setPage('order');
+          });
+  document.getElementById('btnOrderHome')
+          .addEventListener('click', resetAndGoHome);
+  document.getElementById('btnFinish')
+          .addEventListener('click', resetAndGoHome);
+  // Toggle the consent checkbox.
+  document.getElementById('consentRow')
+          .addEventListener('click', (e) => {
+            const row = e.currentTarget;
+            row.dataset.checked = row.dataset.checked === 'true' ? 'false' : 'true';
+          });
+  // Click the dimmed backdrop to dismiss the modal.
+  document.getElementById('addMoreModal')
+          .addEventListener('click', (e) => {
+            if (e.target.id === 'addMoreModal') closeAddMoreModal();
+          });
+
+  // Ticket card clicks: any element with data-ticket="..." navigates.
+  document.querySelectorAll('[data-ticket]').forEach(el => {
+    el.addEventListener('click', () => {
+      navigateToTicket(el.dataset.ticket);
+    });
+  });
+
+  /* ------------------------------------------------------------------
+     BUY-TICKETS PAGE: dates, times, steppers
+  ------------------------------------------------------------------- */
+  // Flat list of all available time slots. Each slot stores its 24h
+  // hour/minute and a label split across two pill lines (e.g. "10:00" + "AM").
+  // Slots run every 30 minutes from 10:00 AM through 8:30 PM.
+  const SLOTS = [
+    { label: '10:00', suffix: 'AM', hour: 10, min:  0 },
+    { label: '10:30', suffix: 'AM', hour: 10, min: 30 },
+    { label: '11:00', suffix: 'AM', hour: 11, min:  0 },
+    { label: '11:30', suffix: 'AM', hour: 11, min: 30 },
+    { label: '12:00', suffix: 'PM', hour: 12, min:  0 },
+    { label: '12:30', suffix: 'PM', hour: 12, min: 30 },
+    { label: '1:00',  suffix: 'PM', hour: 13, min:  0 },
+    { label: '1:30',  suffix: 'PM', hour: 13, min: 30 },
+    { label: '2:00',  suffix: 'PM', hour: 14, min:  0 },
+    { label: '2:30',  suffix: 'PM', hour: 14, min: 30 },
+    { label: '3:00',  suffix: 'PM', hour: 15, min:  0 },
+    { label: '3:30',  suffix: 'PM', hour: 15, min: 30 },
+    { label: '4:00',  suffix: 'PM', hour: 16, min:  0 },
+    { label: '4:30',  suffix: 'PM', hour: 16, min: 30 },
+    { label: '5:00',  suffix: 'PM', hour: 17, min:  0 },
+    { label: '5:30',  suffix: 'PM', hour: 17, min: 30 },
+    { label: '6:00',  suffix: 'PM', hour: 18, min:  0 },
+    { label: '6:30',  suffix: 'PM', hour: 18, min: 30 },
+    { label: '7:00',  suffix: 'PM', hour: 19, min:  0 },
+    { label: '7:30',  suffix: 'PM', hour: 19, min: 30 },
+    { label: '8:00',  suffix: 'PM', hour: 20, min:  0 },
+    { label: '8:30',  suffix: 'PM', hour: 20, min: 30 },
+  ];
+
+  // Buy-page state. dateOffset is days from today (0 = today).
+  const state = {
+    dateOffset: 0,
+    slotIndex: 0,
+    counts: { adult: 1, child: 0, under2: 0, carer: 0,
+              river: 0, binoculars: 0, champagne: 0, photo: 0 },
+  };
+
+  /* ---- Date row (today + next 9 days = 10 days total) ---- */
+  const WEEKDAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function renderDateRow() {
+    const row = document.getElementById('dateRow');
+    if (!row) return;
+    row.innerHTML = '';
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    for (let i = 0; i < 10; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const btn = document.createElement('button');
+      btn.className = 'date-pill';
+      btn.dataset.offset = String(i);
+      if (i === state.dateOffset) btn.dataset.state = 'selected';
+      btn.innerHTML =
+        `<span class="pill-lines">` +
+          `<span class="date-line">${WEEKDAYS[d.getDay()]}</span>` +
+          `<span class="date-line">${d.getDate()} ${MONTHS[d.getMonth()]}</span>` +
+        `</span>`;
+      btn.addEventListener('click', () => {
+        state.dateOffset = i;
+        // When switching dates, re-pick the next available slot for that day
+        // (today still skips past slots; future dates default to the first slot).
+        state.slotIndex = pickNextAvailable(i);
+        renderDateRow();
+        renderTimeSlots();
+      });
+      row.appendChild(btn);
+    }
+  }
+
+  /* ---- Pick the next available slot index in SLOTS for the given date. ---- */
+  // For today (offset 0): skip slots that are already in the past.
+  // For any future date: default to the first slot.
+  function pickNextAvailable(dateOffset) {
+    if (dateOffset !== 0) return 0;
+    const now = new Date();
+    for (let i = 0; i < SLOTS.length; i++) {
+      const t = new Date();
+      t.setHours(SLOTS[i].hour, SLOTS[i].min, 0, 0);
+      if (t > now) return i;
+    }
+    return 0; // past everything today — default to the first slot
+  }
+
+  /* ---- Is this slot disabled (in the past) for the selected date? ---- */
+  function isSlotDisabled(slotIndex, dateOffset) {
+    if (dateOffset !== 0) return false;
+    const t = new Date();
+    t.setHours(SLOTS[slotIndex].hour, SLOTS[slotIndex].min, 0, 0);
+    return t <= new Date();
+  }
+
+  /* ---- Render time slots as two-line pills.
+         Past slots for today are filtered out entirely (not just disabled). ---- */
+  function renderTimeSlots() {
+    const row = document.getElementById('timeSlotRow');
+    if (!row) return;
+    row.innerHTML = '';
+    SLOTS.forEach((s, i) => {
+      // Skip slots that are already in the past for today.
+      if (isSlotDisabled(i, state.dateOffset)) return;
+      const btn = document.createElement('button');
+      btn.className = 'date-pill';
+      if (i === state.slotIndex) btn.dataset.state = 'selected';
+      btn.innerHTML =
+        `<span class="pill-lines">` +
+          `<span class="date-line">${s.label}</span>` +
+          `<span class="date-line">${s.suffix}</span>` +
+        `</span>`;
+      btn.addEventListener('click', () => {
+        state.slotIndex = i;
+        renderTimeSlots();
+      });
+      row.appendChild(btn);
+    });
+  }
+
+  /* ---- Steppers ---- */
+  function refreshStepperRow(rowId) {
+    const row = document.querySelector(`.stepper-row[data-row-id="${rowId}"]`);
+    if (!row) return;
+    const count = state.counts[rowId] ?? 0;
+    const countEl = row.querySelector(`[data-count="${rowId}"]`);
+    if (countEl) countEl.textContent = String(count);
+    row.dataset.selected = count > 0 ? 'true' : 'false';
+    const minus = row.querySelector('.stepper-minus');
+    if (minus) minus.disabled = count <= 0;
+  }
+  document.querySelectorAll('.stepper-plus').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.row;
+      state.counts[id] = (state.counts[id] || 0) + 1;
+      refreshStepperRow(id);
+    });
+  });
+  document.querySelectorAll('.stepper-minus').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.row;
+      if (!state.counts[id]) return;
+      state.counts[id] = Math.max(0, state.counts[id] - 1);
+      refreshStepperRow(id);
+    });
+  });
+
+  /* ---- Initialise the page (called every time we navigate to it). ---- */
+  function initBuyPage() {
+    state.dateOffset = 0;
+    state.slotIndex  = pickNextAvailable(0);
+    renderDateRow();
+    renderTimeSlots();
+    state.counts = { adult: 1, child: 0, under2: 0, carer: 0,
+                     river: 0, binoculars: 0, champagne: 0, photo: 0 };
+    Object.keys(state.counts).forEach(refreshStepperRow);
+  }
+  initBuyPage();
+
+  /* ------------------------------------------------------------------
+     "ADD MORE TO YOUR VISIT" MODAL
+     ------------------------------------------------------------------
+     Madame Tussauds upsell pricing — designed so totals are whole
+     numbers for typical group configurations:
+       Adult     orig £40 → £10
+       Child     orig £34 → £9
+       Under 2   £0       (always free)
+       Carer     £0       (always free)
+     Discount % is computed on the actual group total.
+       1 adult                     →  £40 / £10  (75% off)
+       2 adults + 2 child + 1 u2   → £148 / £38  (74% off)  ← reference
+  ------------------------------------------------------------------- */
+  const ADDMORE_PRICES = {
+    adult:  { orig: 40, disc: 10 },
+    child:  { orig: 34, disc:  9 },
+    under2: { orig:  0, disc:  0 },
+    carer:  { orig:  0, disc:  0 },
+  };
+
+  function computeAddMore() {
+    const c = state.counts;
+    const people = (c.adult || 0) + (c.child || 0) + (c.under2 || 0) + (c.carer || 0);
+    let orig = 0, disc = 0;
+    for (const k of ['adult', 'child', 'under2', 'carer']) {
+      const p = ADDMORE_PRICES[k]; const n = c[k] || 0;
+      orig += p.orig * n;
+      disc += p.disc * n;
+    }
+    const off = orig > 0 ? Math.round((orig - disc) / orig * 100) : 0;
+    return { people, orig, disc, off };
+  }
+
+  function fmtPounds(n) {
+    return '£' + Number(n).toFixed(2);
+  }
+
+  function updateAddMoreModal() {
+    const { people, orig, disc, off } = computeAddMore();
+    const peopleLabel = people === 1 ? '1 person' : people + ' people';
+    document.getElementById('addMorePeople').textContent = peopleLabel;
+    document.getElementById('addMoreOff').textContent = off + '% off';
+    document.getElementById('addMoreStrike').textContent = fmtPounds(orig);
+    document.getElementById('addMorePrice').textContent  = fmtPounds(disc);
+  }
+
+  function openAddMoreModal() {
+    document.getElementById('addMoreModal').classList.add('is-open');
+    document.getElementById('addMoreModal').setAttribute('aria-hidden', 'false');
+  }
+  function closeAddMoreModal() {
+    document.getElementById('addMoreModal').classList.remove('is-open');
+    document.getElementById('addMoreModal').setAttribute('aria-hidden', 'true');
+  }
+  // Initialise modal numbers so they're correct even before first open.
+  updateAddMoreModal();
+
+  /* ------------------------------------------------------------------
+     CHECKOUT PAGE
+     ------------------------------------------------------------------
+     Per-ticket prices for the London Eye experience and the
+     Madame Tussauds upsell. When state.addMTUpsell is true, the
+     adult/child unit price absorbs the MT cost and the total goes up
+     accordingly. Under-2s and Carers stay free in both cases.
+  ------------------------------------------------------------------- */
+  const TICKET_PRICES = {
+    adult:  { label: 'Adult (16+)',          le: 33, mt: 10 },
+    child:  { label: 'Child (2 - 15 Years)', le: 30, mt:  9 },
+    under2: { label: 'Under 2',              le:  0, mt:  0 },
+    carer:  { label: 'Carer',                le:  0, mt:  0 },
+  };
+  const EXTRA_PRICES = {
+    binoculars: { label: 'Mini-Binoculars',                       price: 5  },
+    champagne:  { label: 'Glass of Champagne in the Eye Lounge',  price: 18 },
+    photo:      { label: 'Premium Photo Package',                 price: 25 },
+    river:      { label: 'River cruise',                          price: 15 },
+  };
+  const TAX_RATE = 0.25; // 25% tax included in the total
+
+  function getSelectedDateLabel() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const d = new Date(today);
+    d.setDate(today.getDate() + (state.dateOffset || 0));
+    return WEEKDAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
+  }
+  function getSelectedTimeLabel() {
+    const s = SLOTS[state.slotIndex];
+    return s ? `${s.label} ${s.suffix}` : '';
+  }
+
+  function renderCheckout() {
+    const c = state.counts;
+    const upsell = !!state.addMTUpsell;
+
+    // Title block + section header.
+    // - No upsell: title "London Eye | Standard ticket", subtitle prefix "London Eye"
+    // - With upsell: title "London Eye + Madame Tussauds", subtitle prefix "Multi-attraction"
+    // The Purchase-details section header always says "London Eye" because
+    // only the London Eye visit is scheduled at this moment; Madame Tussauds
+    // is booked separately within the 90-day window.
+    const titles = pageTitles('Checkout', upsell);
+    document.getElementById('checkoutTitle').textContent    = titles.title;
+    document.getElementById('checkoutSubtitle').textContent = titles.subtitle;
+    document.getElementById('checkoutSection').textContent  = 'London Eye';
+
+    // Date + time line
+    document.getElementById('checkoutDateTime').textContent =
+      getSelectedDateLabel() + ' - ' + getSelectedTimeLabel();
+
+    // "Other experiences" block visibility — show if upsell or river-cruise
+    // add-on is in the cart.
+    const showOther = upsell || (c.river || 0) > 0;
+    document.getElementById('checkoutOtherSection').style.display = showOther ? 'flex' : 'none';
+    document.getElementById('checkoutOtherDivider1').style.display = showOther ? 'block' : 'none';
+    document.getElementById('checkoutOtherDivider2').style.display = showOther ? 'block' : 'none';
+
+    // Build line items
+    const items = [];
+    let total = 0;
+    for (const k of ['adult', 'child', 'under2', 'carer']) {
+      const n = c[k] || 0;
+      if (!n) continue;
+      const t = TICKET_PRICES[k];
+      const per = t.le + (upsell ? t.mt : 0);
+      const lineTotal = per * n;
+      total += lineTotal;
+      items.push(makeLineItem(n, t.label, lineTotal));
+    }
+    for (const k of ['binoculars', 'champagne', 'photo', 'river']) {
+      const n = c[k] || 0;
+      if (!n) continue;
+      const e = EXTRA_PRICES[k];
+      const lineTotal = e.price * n;
+      total += lineTotal;
+      items.push(makeLineItem(n, e.label, lineTotal));
+    }
+    document.getElementById('checkoutLineItems').innerHTML = items.join('');
+
+    const tax = total * TAX_RATE;
+    document.getElementById('checkoutTax').textContent   = fmtPounds(tax);
+    document.getElementById('checkoutTotal').textContent = fmtPounds(total);
+  }
+
+  function makeLineItem(count, label, total) {
+    return '<div class="line-item">' +
+             '<div class="line-count">' + count + 'x</div>' +
+             '<div class="line-label">' + label + '</div>' +
+             '<div class="line-price">' + fmtPounds(total) + '</div>' +
+           '</div>';
+  }
+
+  // Render once at load so even a direct deep-link looks reasonable.
+  renderCheckout();
+
+  /* ------------------------------------------------------------------
+     PAYMENT-METHOD PAGE
+     ------------------------------------------------------------------
+     Same header pattern as checkout. h1 is constant; subtitle reflects
+     whether the Madame Tussauds upsell was accepted.
+  ------------------------------------------------------------------- */
+  function renderPayment() {
+    const upsell = !!state.addMTUpsell;
+    const titles = pageTitles('Payment Method', upsell);
+    document.getElementById('paymentTitle').textContent    = titles.title;
+    document.getElementById('paymentSubtitle').textContent = titles.subtitle;
+  }
+  renderPayment();
+
+  /* ------------------------------------------------------------------
+     SHARED TITLE / SUBTITLE BUILDER
+     ------------------------------------------------------------------
+     - No upsell  → h1 "London Eye | Standard ticket",
+                    subtitle "London Eye | <PageName>"
+     - With upsell → h1 "London Eye + Madame Tussauds",
+                    subtitle "Multi-attraction | <PageName>"
+  ------------------------------------------------------------------- */
+  function pageTitles(pageName, upsell) {
+    if (upsell) {
+      return {
+        title:    'London Eye + Madame Tussauds',
+        subtitle: 'Multi-attraction | ' + pageName,
+      };
+    }
+    return {
+      title:    'London Eye | Standard ticket',
+      subtitle: 'London Eye | ' + pageName,
+    };
+  }
+
+  /* ------------------------------------------------------------------
+     ORDER / SUCCESS PAGE
+  ------------------------------------------------------------------- */
+  function generateOrderId() {
+    // 9-digit number (no leading zero), like the reference: 739374943
+    return String(Math.floor(100000000 + Math.random() * 900000000));
+  }
+  function renderOrder() {
+    const upsell = !!state.addMTUpsell;
+    const titles = pageTitles('Your order', upsell);
+    document.getElementById('orderTitle').textContent    = titles.title;
+    document.getElementById('orderSubtitle').textContent = titles.subtitle;
+    document.getElementById('orderIdValue').textContent  = generateOrderId();
+  }
+  renderOrder();
+
+  /* Reset the cart and return to home — used by Finish + Home buttons
+     after the payment is complete. */
+  function resetAndGoHome() {
+    state.addMTUpsell = false;
+    state.dateOffset  = 0;
+    state.slotIndex   = pickNextAvailable(0);
+    state.counts = { adult: 1, child: 0, under2: 0, carer: 0,
+                     river: 0, binoculars: 0, champagne: 0, photo: 0 };
+    Object.keys(state.counts).forEach(refreshStepperRow);
+    renderDateRow();
+    renderTimeSlots();
+    updateAddMoreModal();
+    renderCheckout();
+    renderPayment();
+    renderOrder();
+    navigateHome();
+  }
+
+  /* ------------------------------------------------------------------
+     FIT-TO-VIEWPORT SCALING
+  ------------------------------------------------------------------- */
+  const FRAME_W = 1080;
+  const FRAME_H = 1920;
+  function fit() {
+    const scale = Math.min(window.innerWidth / FRAME_W, window.innerHeight / FRAME_H);
+    frame.style.transform = `scale(${scale})`;
+  }
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', fit);
+  fit();
+</script>
+
+</body>
+</html>
