@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>London Eye — Confirm and pay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --navy:        #092241;
+    --text-black:  #031419;
+    --text-sub:    #536B75;
+    --border:      #CCD2D8;
+    --line:        #E8E8E8;
+    --blue:        #518EC8;
+    --bg-card:     #EEF3F8;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Barlow', sans-serif; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #d8d8d8;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100%;
+    color: var(--text-black);
+  }
+  body { display: flex; align-items: center; justify-content: center; padding: 16px 0; min-height: 100vh; }
+  .device {
+    width: 393px;
+    height: 852px;
+    background: white;
+    position: relative;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+  }
+  /* Inner scroll region so checkout content scrolls inside the fixed device frame. */
+  .device .scroll-region {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .device .scroll-region::-webkit-scrollbar { display: none; }
+
+  /* ===== iOS status bar ===== */
+  .ios-status {
+    height: 58px;
+    padding-top: 21px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 16px;
+    padding-right: 16px;
+    font-family: -apple-system, 'SF Pro', Inter, sans-serif;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .ios-status .time { font-size: 17px; font-weight: 590; }
+  .ios-status .icons { display: flex; gap: 7px; align-items: center; font-size: 13px; }
+
+  /* Merlin partner banner — shared with the rest of the in-app flow. */
+  .merlin-banner {
+    background: #092241;
+    text-align: center;
+    padding: 8px 0;
+    position: sticky;
+    top: 58px;
+    z-index: 28;
+  }
+  .merlin-banner img { height: 16px; display: inline-block; vertical-align: middle; }
+
+  /* ===== Header ===== */
+  .nav {
+    height: 64px;
+    background: white;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 58px;
+    z-index: 29;
+  }
+  .nav .back, .nav .placeholder {
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: black;
+  }
+  .nav .back svg { width: 22px; height: 22px; }
+  .nav h1 {
+    flex: 1;
+    text-align: center;
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    color: black;
+  }
+
+  /* ===== Body ===== */
+  .body {
+    padding: 24px 16px 24px;
+    display: flex; flex-direction: column; gap: 24px;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .body::-webkit-scrollbar { display: none; }
+
+  /* Order summary row */
+  .order-row { display: flex; align-items: center; gap: 12px; }
+  .order-thumb {
+    width: 72px; height: 72px;
+    border-radius: 8px; overflow: hidden;
+    background: #ECECEC;
+    flex-shrink: 0;
+  }
+  .order-title { font-size: 16px; font-weight: 500; line-height: 1.5; color: var(--text-black); }
+
+  /* Collage — mirrors the bundle page so the checkout shows all selected attractions
+     using the same layout (Eye + 1..4 secondaries). */
+  .thumb-collage {
+    width: 100%; height: 100%;
+    display: grid;
+    position: relative;
+  }
+  .thumb-collage > img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    min-width: 0; min-height: 0;
+  }
+  .thumb-collage > img[data-id="tussauds"] { object-position: center top; }
+  .thumb-collage-1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  .thumb-collage-2 { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  .thumb-collage-3 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  .thumb-collage-3 > img:nth-child(1) { grid-column: 1 / 3; grid-row: 1; }
+  .thumb-collage-3 > img:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .thumb-collage-3 > img:nth-child(3) { grid-column: 2; grid-row: 2; }
+  .thumb-collage-4 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  .thumb-collage-5 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  .thumb-collage-5 > img:nth-child(5) {
+    position: absolute;
+    width: 50%; height: 50%;
+    top: 25%; left: 25%;
+    border-radius: 50%;
+  }
+
+  /* Divider */
+  .hr { height: 1px; background: var(--border); border: 0; margin: 0; }
+
+  /* ===== Section header ===== */
+  .sect h2 { font-size: 16px; font-weight: 500; margin: 0 0 8px; color: var(--text-black); line-height: 1.5; }
+  .sect p { margin: 0; font-size: 14px; line-height: 1.43; color: #06232C; }
+  .sect p strong, .sect p .lbl { font-weight: 700; }
+  .sect .field-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+  .sect .field-row .left { display: flex; align-items: center; gap: 8px; }
+  .sect .field-row .info {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 1px solid var(--text-black);
+    display: grid; place-items: center;
+    font-size: 10px; font-weight: 600;
+    color: var(--text-black);
+    line-height: 1;
+  }
+
+  /* Price details */
+  .totals { display: flex; flex-direction: column; gap: 8px; }
+  .totals .row { display: flex; justify-content: space-between; align-items: center; font-size: 16px; line-height: 1.5; }
+  .totals .row .num { font-weight: 400; }
+  .totals .row.total .lbl, .totals .row.total .num { font-weight: 500; }
+  .price-h { font-size: 20px; font-weight: 600; line-height: 1.3; margin: 0 0 8px; color: var(--text-black); }
+
+  /* Voucher row */
+  .voucher {
+    display: flex; align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-black);
+  }
+  .voucher svg.tag { width: 18px; height: 18px; flex-shrink: 0; }
+  .voucher .label { flex: 1; }
+  .voucher svg.chev { width: 16px; height: 16px; flex-shrink: 0; transition: transform 200ms; }
+  .voucher.open svg.chev { transform: rotate(180deg); }
+  .voucher-body { display: none; padding: 8px 0; }
+  .voucher.open + .voucher-body { display: block; }
+  .voucher-body input {
+    width: 100%;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0 12px;
+    font: 400 14px/1 'Barlow', sans-serif;
+    color: var(--text-black);
+  }
+  .voucher-body input:focus { outline: 2px solid var(--blue); outline-offset: -1px; border-color: var(--blue); }
+
+  /* Payment method */
+  .pay-h { font-size: 20px; font-weight: 500; line-height: 1.3; margin: 0 0 4px; color: var(--text-black); }
+  .pay-option {
+    padding: 12px 0;
+    display: flex; align-items: center; gap: 16px;
+    cursor: pointer;
+  }
+  .pay-radio {
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: white;
+    position: relative;
+  }
+  .pay-option.selected .pay-radio {
+    border-color: var(--navy);
+    background: var(--navy);
+  }
+  .pay-option.selected .pay-radio::after {
+    content: ''; position: absolute;
+    inset: 4px;
+    background: white;
+    border-radius: 50%;
+  }
+  .pay-option .pay-label-row { display: flex; align-items: center; gap: 8px; flex: 1; }
+  .pay-option .pay-label-row .icon {
+    width: 30px; height: 20px;
+    border: 0.5px solid var(--border);
+    border-radius: 4px;
+    display: grid; place-items: center;
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-weight: 900;
+    font-size: 7px;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+  }
+  .pay-option .pay-label-row .icon.card { background: white; color: var(--text-sub); }
+  .pay-option .pay-label-row .icon.apple { background: black; color: white; font-family: -apple-system, 'SF Pro', Inter; font-weight: 500; font-size: 9px; }
+  .pay-option .pay-label-row .icon.paypal { background: white; color: #003087; font-style: italic; font-size: 8px; }
+  .pay-option .pay-label-row .name { font-size: 16px; color: var(--text-black); }
+  .pay-icons-row { display: flex; gap: 4px; flex-shrink: 0; }
+  .pay-icons-row .ci {
+    width: 26px; height: 16px;
+    border: 0.5px solid var(--border);
+    border-radius: 3px;
+    display: grid; place-items: center;
+    background: white;
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-weight: 900;
+    font-size: 6px;
+    letter-spacing: 0.3px;
+  }
+  .pay-icons-row .ci.visa  { color: #1434CB; }
+  .pay-icons-row .ci.mc    { color: #EB001B; }
+  .pay-icons-row .ci.amex  { color: #2E77BB; }
+  .pay-icons-row .ci.disc  { color: #F47216; }
+  .pay-icons-row .ci.jcb   { color: #0E4C96; }
+
+  .pay-sub { font-size: 14px; color: var(--text-sub); margin-left: 32px; margin-top: -4px; padding-bottom: 8px; }
+
+  /* Card form */
+  .card-form {
+    display: flex; flex-direction: column; gap: 16px;
+    padding-top: 8px; padding-bottom: 16px;
+  }
+  .card-form .field {
+    width: 100%;
+    height: 56px;
+    padding: 0 12px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font: 400 16px/1 'Barlow', sans-serif;
+    color: var(--text-black);
+  }
+  .card-form .field::placeholder { color: var(--text-sub); }
+  .card-form .field:focus { outline: 2px solid var(--blue); outline-offset: -1px; border-color: var(--blue); }
+  .card-form .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .secure {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 14px; color: var(--text-black);
+  }
+  .secure svg { width: 14px; height: 14px; }
+
+  /* Terms */
+  .terms { display: flex; flex-direction: column; gap: 8px; }
+  .terms a {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 14px; color: var(--text-sub);
+    text-decoration: none;
+  }
+  .terms a svg { width: 12px; height: 12px; }
+
+  /* Sticky bottom CTA + iOS Safari bar */
+  .pay-bar {
+    background: white;
+    padding: 16px;
+    position: sticky;
+    bottom: 0;
+    z-index: 25;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+  }
+  .pay-btn {
+    width: 100%; height: 48px;
+    background: var(--blue);
+    color: white;
+    border: 0;
+    border-radius: 8px;
+    font: 400 20px/1 'Barlow', sans-serif;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    transition: filter 150ms;
+    text-transform: uppercase;
+  }
+  .pay-btn:active { filter: brightness(0.92); }
+
+  .ios-safari {
+    background: rgba(250,250,250,0.85);
+    backdrop-filter: blur(12px);
+    border-radius: 0;
+    padding: 8px 16px 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    border-top: 1px solid rgba(0,0,0,0.06);
+  }
+  .ios-safari .url-bar {
+    width: 100%;
+    max-width: 326px;
+    height: 36px;
+    background: rgba(0,0,0,0.05);
+    border-radius: 22px;
+    display: flex; align-items: center; justify-content: center;
+    font: 500 14px/1 -apple-system, 'SF Pro', Inter, sans-serif;
+    color: #1B1B1B;
+    gap: 6px;
+  }
+  .ios-safari .actions {
+    width: 100%;
+    display: flex; justify-content: space-around;
+    color: #1B1B1B;
+    font-size: 22px;
+    font-family: -apple-system, 'SF Pro', Inter, sans-serif;
+  }
+</style>
+</head>
+<body>
+<div class="device">
+
+  <!-- iOS status bar -->
+  <div class="ios-status">
+    <span class="time">9:41</span>
+    <span class="icons">▌▌▌ 📶 🔋</span>
+  </div>
+
+  <!-- Merlin partner banner -->
+  <a class="merlin-banner" href="landing.html" aria-label="Back to London Eye home" style="text-decoration:none; display:block;">
+    <img src="Merlin.png" alt="Merlin"/>
+  </a>
+
+  <!-- Header -->
+  <nav class="nav">
+    <button class="back" aria-label="Back" onclick="goBackFromCheckout()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <h1>Confirm and pay</h1>
+    <div class="placeholder"></div>
+  </nav>
+
+  <div class="body">
+
+    <!-- Order summary row -->
+    <div class="order-row" id="order-row">
+      <div class="order-thumb" id="order-thumb"></div>
+      <div class="order-title" id="order-title">London Eye</div>
+    </div>
+
+    <hr class="hr" />
+
+    <!-- Date -->
+    <div class="sect">
+      <h2>Date</h2>
+      <p><span class="lbl">London Eye:</span> <span id="le-date">Friday, 7 Feb - 06:00 PM</span></p>
+      <p id="other-line" style="margin-top:6px"><span class="lbl">Other experiences:</span> Schedule within 90 days of purchase</p>
+    </div>
+
+    <!-- Tickets and extras -->
+    <div class="sect">
+      <h2>Tickets and extras</h2>
+      <div id="tickets-list"></div>
+    </div>
+
+    <hr class="hr" />
+
+    <!-- Price details -->
+    <div class="sect">
+      <h2 class="price-h">Price details</h2>
+      <div class="totals">
+        <div class="row"><span class="lbl">Subtotal</span><span class="num" id="subtotal">£0.00</span></div>
+        <div class="row"><span class="lbl">Fees</span><span class="num">£0.00</span></div>
+        <div class="row total"><span class="lbl">Total</span><span class="num" id="total">£0.00</span></div>
+      </div>
+    </div>
+
+    <hr class="hr" />
+
+    <!-- Voucher / giftcard / discount -->
+    <div>
+      <div class="voucher" id="voucher-toggle">
+        <svg class="tag" viewBox="0 0 18 18" fill="none">
+          <path d="M9 1 L1 1 L1 9 L9 17 L17 9 Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <circle cx="4" cy="4" r="1" fill="currentColor"/>
+        </svg>
+        <span class="label">Voucher, giftcard or discount code</span>
+        <svg class="chev" viewBox="0 0 16 16" fill="none">
+          <path d="M3 6l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="voucher-body">
+        <input placeholder="Enter code" />
+      </div>
+    </div>
+
+    <hr class="hr" />
+
+    <!-- Payment method -->
+    <div>
+      <div class="pay-h">Payment method</div>
+
+      <!-- New card -->
+      <div class="pay-option selected" data-method="card" id="opt-card">
+        <div class="pay-radio"></div>
+        <div class="pay-label-row">
+          <div class="icon card">
+            <svg width="14" height="11" viewBox="0 0 16 12" fill="none"><rect x="0.5" y="0.5" width="15" height="11" rx="1.5" stroke="currentColor"/><rect x="0" y="3" width="16" height="2" fill="currentColor"/></svg>
+          </div>
+          <span class="name">New card</span>
+        </div>
+        <div class="pay-icons-row">
+          <div class="ci visa">VISA</div>
+          <div class="ci mc">MC</div>
+          <div class="ci amex">AMEX</div>
+          <div class="ci disc">DISC</div>
+          <div class="ci jcb">JCB</div>
+        </div>
+      </div>
+
+      <!-- Card form (shown when card method selected) -->
+      <div class="card-form" id="card-form">
+        <input class="field" placeholder="Card number" inputmode="numeric" autocomplete="cc-number"/>
+        <div class="pair">
+          <input class="field" placeholder="Expiry" inputmode="numeric" autocomplete="cc-exp"/>
+          <input class="field" placeholder="CVC" inputmode="numeric" autocomplete="cc-csc"/>
+        </div>
+        <input class="field" placeholder="Postal code" autocomplete="postal-code"/>
+        <div class="secure">
+          <svg viewBox="0 0 14 14" fill="none"><path d="M3 6V4a4 4 0 0 1 8 0v2M2.5 6h9v6a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1V6Z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>
+          Your payment info is stored securely
+        </div>
+      </div>
+
+      <!-- Apple Pay -->
+      <div class="pay-option" data-method="apple" id="opt-apple">
+        <div class="pay-radio"></div>
+        <div class="pay-label-row">
+          <div class="icon apple"> Pay</div>
+          <span class="name">Apple Pay</span>
+        </div>
+      </div>
+
+      <!-- PayPal -->
+      <div class="pay-option" data-method="paypal" id="opt-paypal">
+        <div class="pay-radio"></div>
+        <div class="pay-label-row">
+          <div class="icon paypal">PayPal</div>
+          <span class="name">New PayPal account</span>
+        </div>
+      </div>
+      <div class="pay-sub">Pay in 3 interest-free payments</div>
+    </div>
+
+    <hr class="hr" />
+
+    <!-- Terms -->
+    <div class="terms">
+      <a href="#">Terms and conditions of use <svg viewBox="0 0 12 12" fill="none"><path d="M3 9l6-6M9 3H4M9 3v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <a href="#">Privacy policy <svg viewBox="0 0 12 12" fill="none"><path d="M3 9l6-6M9 3H4M9 3v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </div>
+
+  </div>
+
+  <!-- Sticky pay bar -->
+  <div class="pay-bar">
+    <button class="pay-btn" id="pay-btn">PAY</button>
+  </div>
+
+  <!-- iOS Safari faux URL bar -->
+  <div class="ios-safari">
+    <div class="url-bar">
+      <span aria-hidden="true">🔒</span>
+      <span>https://tickets.londoneye.com</span>
+      <span aria-hidden="true">↻</span>
+    </div>
+    <div class="actions">
+      <span>‹</span><span>›</span><span>⤴</span><span>📖</span><span>⛶</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* Back navigation is multi-aware: if the user reached checkout through the
+   multi-attraction flow, the back arrow returns to schedule (the "multi-venue
+   plan") rather than to the bundle/upsell screen. */
+function goBackFromCheckout() {
+  try {
+    const co = JSON.parse(localStorage.getItem('feverCheckout') || 'null');
+    if (co && co.mode === 'multi') {
+      window.location.href = 'schedule.html';
+      return;
+    }
+  } catch (e) {}
+  if (history.length > 1) history.back();
+  else window.location.href = 'fever-bundle-prototype_1.html';
+}
+
+(function () {
+  /* ===== Read checkout data left by previous pages ===== */
+  let data = null;
+  try {
+    const raw = localStorage.getItem('feverCheckout');
+    if (raw) data = JSON.parse(raw);
+  } catch (e) { /* localStorage blocked */ }
+
+  // Fallback / demo data if no localStorage payload present
+  if (!data) {
+    data = {
+      londonEye: 126,
+      secondaries: [{ id: 'tussauds', name: 'Madame Tussauds', paid: 33, anchor: 148 }],
+      schedule: {
+        tickets: [
+          { name: 'Adult (16+)',         qty: 2, price: 33 },
+          { name: 'Child (2 - 15 Years)', qty: 2, price: 30 },
+          { name: 'Under 2',             qty: 1, price:  0 },
+        ],
+        addons: [],
+        date: 'Friday, 7 Feb',
+        time: '06:00 PM',
+      },
+    };
+  }
+
+  /* ===== Order summary ===== */
+  const secondaries = data.secondaries || [];
+  const hasSecondaries = secondaries.length > 0;
+
+  // Title: "London Eye + Name1 + Name2" or just "London Eye"
+  const orderTitle = document.getElementById('order-title');
+  if (hasSecondaries) {
+    orderTitle.textContent = 'London Eye + ' + secondaries.map(s => s.name).join(' + ');
+  } else {
+    orderTitle.textContent = 'London Eye - Standard ticket';
+  }
+
+  // Thumb: same collage as the bundle page — Eye + all selected secondaries in the order they were picked.
+  const ATTRACTION_IMAGE = {
+    tussauds: 'Madame Tussauds.png',
+    sealife:  'SEA Life Aquarium.png',
+    shreks:   "Shrek's Adventure.png",
+    dungeon:  'The London Dungeon.png',
+    bigbus:   'Big Bus.png',
+  };
+  const thumb = document.getElementById('order-thumb');
+  const cells = [
+    '<img src="London Eye.jpg" alt="London Eye" data-id="eye" />',
+    ...secondaries.map(s =>
+      `<img src="${ATTRACTION_IMAGE[s.id] || 'London Eye.jpg'}" alt="${s.name}" data-id="${s.id}" />`
+    ),
+  ];
+  const n = cells.length;
+  thumb.innerHTML = `<div class="thumb-collage thumb-collage-${n}">${cells.join('')}</div>`;
+
+  /* ===== Date section — show 'Other experiences' line only if secondaries exist ===== */
+  document.getElementById('other-line').style.display = hasSecondaries ? '' : 'none';
+
+  const sched = data.schedule || {};
+  const dateStr = sched.date || 'Friday, 7 Feb';
+  const timeStr = sched.time || sched.timeslot || '06:00 PM';
+  document.getElementById('le-date').textContent = `${dateStr} - ${timeStr}`;
+
+  /* ===== Tickets and extras list ===== */
+  // Aggregate each ticket type into ONE line that totals the London Eye contribution
+  // PLUS that same type's share of every secondary attraction (so adult line covers
+  // 1 adult × London Eye + 1 adult × Tussauds + 1 adult × SEA Life, etc.).
+  const ticketsList = document.getElementById('tickets-list');
+  const lines = [];
+
+  // Per-type totals across all secondary attractions.
+  const secondariesAdultTotal = secondaries.reduce(
+    (sum, s) => sum + (s.adultUnit || 0) * (s.adultCount || 0), 0
+  );
+  const secondariesChildTotal = secondaries.reduce(
+    (sum, s) => sum + (s.childUnit || 0) * (s.childCount || 0), 0
+  );
+
+  // 1) Standard ticket lines (Adult / Child / Under 2 / Carer) — totals include secondaries.
+  (sched.tickets || []).filter(t => t.qty > 0).forEach(t => {
+    const n = (t.name || '').toLowerCase();
+    let extra = 0;
+    if (n.startsWith('adult'))      extra = secondariesAdultTotal;
+    else if (n.startsWith('child')) extra = secondariesChildTotal;
+    // Under 2 and Carer pay £0 across LE and every secondary, so no extra is added.
+    const total = t.qty * t.price + extra;
+    lines.push({ label: `${t.qty} x ${t.name}`, amount: total });
+  });
+
+  // 2) Add-ons from schedule (River cruise, Binoculars, etc.) — kept on their own lines.
+  (sched.addons || []).forEach(a => {
+    lines.push({ label: a.qty > 1 ? `${a.qty} x ${a.name}` : `1 x ${a.name}`, amount: a.qty * a.unit });
+  });
+
+  ticketsList.innerHTML = lines.map(l =>
+    `<div class="field-row">` +
+      `<div class="left"><span>${l.label}</span>` +
+        `<span class="info" aria-label="More info">i</span>` +
+      `</div>` +
+      `<span>£${l.amount.toFixed(2)}</span>` +
+    `</div>`
+  ).join('');
+
+  /* ===== Price details ===== */
+  // Subtotal is just the sum of every listed line — every contribution to the order is in `lines`.
+  const subtotal = lines.reduce((sum, l) => sum + l.amount, 0);
+
+  document.getElementById('subtotal').textContent = '£' + subtotal.toFixed(2);
+  document.getElementById('total').textContent    = '£' + subtotal.toFixed(2);
+  document.getElementById('pay-btn').textContent  = 'PAY · £' + subtotal.toFixed(2);
+
+  /* ===== Voucher accordion ===== */
+  const voucher = document.getElementById('voucher-toggle');
+  voucher.addEventListener('click', () => voucher.classList.toggle('open'));
+
+  /* ===== Payment method selection ===== */
+  const cardForm = document.getElementById('card-form');
+  function selectPayment(method) {
+    document.querySelectorAll('.pay-option').forEach(el => {
+      el.classList.toggle('selected', el.dataset.method === method);
+    });
+    cardForm.style.display = method === 'card' ? '' : 'none';
+  }
+  document.querySelectorAll('.pay-option').forEach(el => {
+    el.addEventListener('click', () => selectPayment(el.dataset.method));
+  });
+  selectPayment('card');
+
+  /* ===== Pay button ===== */
+  document.getElementById('pay-btn').addEventListener('click', () => {
+    alert('Prototype: payment would be processed here.');
+  });
+})();
+</script>
+</body>
+</html>
