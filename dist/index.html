@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>The London Eye — Tickets &amp; Experiences</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --navy: #092241;
+    --blue: #518EC8;
+    --text-secondary: #757575;
+    --line: #E5E5E5;
+    --bg-page: #FFFFFF;
+    --bg-soft: #F4F4F4;
+    --bg-softer: #F7F7F7;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #d8d8d8; /* device frame — matches the rest of the app */
+    font-family: 'Barlow', sans-serif;
+    color: var(--navy);
+  }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 0;
+  }
+  /* Device frame — identical across landing / picker / schedule / bundle / checkout */
+  .device {
+    width: 393px;
+    height: 852px;
+    margin: 0 auto;
+    background: var(--bg-page);
+    position: relative;
+    border-radius: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.08);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .device::-webkit-scrollbar { display: none; }
+
+  /* ===== Header (status band + nav) ===== */
+  .status-band {
+    height: 30px;
+    background: var(--navy);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 400;
+  }
+  .nav {
+    height: 80px;
+    background: white;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 80px 1fr 80px;
+    align-items: center;
+  }
+  .nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--navy);
+  }
+  .nav-btn .ic {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--navy);
+    color: var(--blue);
+    display: grid;
+    place-items: center;
+  }
+  .nav-btn .ic svg { width: 18px; height: 18px; }
+  .nav-btn span { font-size: 12px; }
+  .nav-logo {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--navy);
+  }
+  .nav-logo .eye-mark {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border: 2.5px solid var(--blue);
+    border-radius: 50%;
+    margin-right: 4px;
+    position: relative;
+    top: 3px;
+  }
+  .menu-btn {
+    background: none; border: 0; cursor: pointer; padding: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    color: var(--navy);
+    font-family: inherit; font-size: 12px;
+  }
+  .menu-btn .lines { display: grid; grid-template-rows: repeat(3, 2px); gap: 6px; }
+  .menu-btn .lines span { display: block; width: 28px; height: 2px; background: var(--navy); border-radius: 1px; }
+
+  /* ===== Hero ===== */
+  .hero {
+    position: relative;
+    height: 500px;
+    overflow: hidden;
+    background: var(--navy);
+  }
+  .hero-img {
+    position: absolute; inset: 0;
+    background-image: url('Background.png');
+    background-size: cover;
+    background-position: center;
+    filter: brightness(0.65);
+  }
+  .hero-bottom-grad {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 50%;
+    background: linear-gradient(180deg, transparent 0%, var(--navy) 100%);
+  }
+  .hero-content {
+    position: absolute; left: 16px; right: 16px; bottom: 80px;
+    color: white;
+  }
+  .hero-pill {
+    display: inline-block;
+    background: #778DA9;
+    color: white;
+    padding: 6px 10px;
+    font-size: 16px;
+    font-weight: 400;
+    margin-bottom: 12px;
+  }
+  .hero-title {
+    display: inline-block;
+    background: var(--navy);
+    color: white;
+    padding: 8px 12px 12px;
+    font-size: 30px;
+    font-weight: 400;
+    line-height: 1.1;
+    margin: 0;
+  }
+  .hero-dots {
+    position: absolute; left: 0; right: 0; bottom: 78px;
+    display: flex; justify-content: center; gap: 6px;
+    pointer-events: none;
+  }
+  .hero-dots span {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(255,255,255,0.4);
+  }
+  .hero-dots span.active { background: white; }
+  .hero-cta-wrap {
+    position: absolute; left: 16px; right: 16px; bottom: 16px;
+  }
+  .btn-primary {
+    display: block; width: 100%;
+    background: var(--blue);
+    color: white;
+    border: 0;
+    border-radius: 12px;
+    height: 60px;
+    font-size: 20px;
+    font-weight: 400;
+    font-family: inherit;
+    cursor: pointer;
+    letter-spacing: 0.2px;
+    text-decoration: none;
+    text-align: center;
+    line-height: 60px;
+    transition: filter 150ms;
+  }
+  .btn-primary:active { filter: brightness(0.92); }
+
+  /* ===== Popular tickets quick-link stack ===== */
+  .quick-links {
+    background: white;
+    border-bottom: 1px solid var(--line);
+  }
+  .ql {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border-top: 1px solid var(--line);
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--navy);
+  }
+  .quick-links .ql:first-child { border-top: 0; }
+  .ql-ic {
+    width: 48px; height: 48px;
+    display: grid; place-items: center;
+    color: var(--blue);
+    flex-shrink: 0;
+  }
+  .ql-ic svg { width: 38px; height: 38px; }
+  .ql-body { flex: 1; min-width: 0; }
+  .ql-body .t { font-size: 22px; font-weight: 500; line-height: 1; margin-bottom: 6px; }
+  .ql-body .s { font-size: 12px; color: var(--navy); line-height: 1.2; }
+  .ql-chev { color: var(--blue); flex-shrink: 0; }
+  .ql-chev svg { width: 12px; height: 19px; }
+
+  /* ===== Horizontal card row (the two plan options) ===== */
+  /* Horizontal snap-scroll carousel. 320px-wide cards sit flush against each other,
+     ~70px of the next card peeks in from the right edge of the 390px viewport. */
+  .plan-row {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    gap: 0;
+    margin: 24px 0 0;
+    -webkit-overflow-scrolling: touch;
+  }
+  .plan-row::-webkit-scrollbar { display: none; }
+  .plan-card {
+    flex: 0 0 320px;
+    scroll-snap-align: start;
+    background: white;
+    /* No borders on the wrapper. The body section below has its own border
+       so the image bleeds to the top and sides while the body stays framed. */
+    border: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 1px; /* tiny gap between image and body — shows card background through */
+    text-decoration: none;
+    color: inherit;
+  }
+  .plan-card.recommended { background: var(--bg-softer); }
+  .plan-card-img {
+    position: relative;
+    height: 245px;
+    background: #E7E7E7;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .plan-card-img img,
+  .plan-card-img .illus {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .plan-price-tag {
+    position: absolute; top: 0; right: 0;
+    background: var(--blue);
+    color: white;
+    width: 72px;
+    padding: 10px 0;
+    text-align: center;
+    line-height: 1.15;
+  }
+  .plan-price-tag .ttl { font-size: 12px; }
+  .plan-price-tag .amt { font-size: 28px; font-weight: 700; margin: 2px 0; }
+  .plan-price-tag .sub { font-size: 12px; }
+  .plan-card-body {
+    padding: 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    /* Body has its own frame — left, right, bottom. No top border so the 1px gap
+       between image and body shows the card background, matching the reference. */
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .plan-card-body h3 {
+    margin: 0 0 12px;
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1.1;
+  }
+  .plan-card-body p {
+    margin: 0;
+    color: var(--navy);
+    font-size: 15px;
+    line-height: 1.4;
+  }
+  .plan-card .btn-primary {
+    margin-top: auto;
+    height: 56px;
+    line-height: 56px;
+    font-size: 18px;
+  }
+  /* Dot indicator below the carousel */
+  .plan-dots {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    padding: 18px 0 0;
+  }
+  .plan-dots span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--navy);
+    opacity: 0.4;
+    transition: opacity 180ms;
+  }
+  .plan-dots span.active { opacity: 1; }
+
+  /* ===== Multi-attraction featured section ===== */
+  .feature {
+    margin: 48px 0 0;
+  }
+  .feature .feature-img-wrap {
+    position: relative;
+    width: 100%;
+  }
+  .feature img.feature-img {
+    width: 100%; height: 390px; object-fit: cover; display: block;
+  }
+  .feature-price-tag {
+    position: absolute; top: 0; right: 0;
+    background: var(--blue);
+    color: white;
+    width: 102px;
+    padding: 12px 0;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .feature-price-tag .ttl { font-size: 14px; }
+  .feature-price-tag .amt { font-size: 32px; font-weight: 700; margin: 4px 0; line-height: 1.1; }
+  .feature-price-tag .sub { font-size: 14px; }
+  .feature .feature-body {
+    padding: 24px 16px 32px;
+  }
+  .feature h2 {
+    margin: 0 0 14px;
+    font-size: 30px;
+    font-weight: 400;
+    line-height: 1.05;
+  }
+  .feature .lead {
+    color: var(--navy);
+    font-size: 18px;
+    line-height: 1.05;
+    margin: 0 0 24px;
+  }
+  .feature p {
+    color: var(--navy);
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 0 0 16px;
+  }
+  .feature strong { font-weight: 700; }
+  .feature .btn-primary { margin-top: 16px; }
+
+  /* ===== Generic section stub ===== */
+  .stub {
+    padding: 32px 16px;
+    border-top: 1px solid var(--line);
+    color: var(--navy);
+  }
+  .stub h2 { margin: 0 0 10px; font-size: 26px; font-weight: 400; line-height: 1.1; }
+  .stub .preview {
+    height: 120px;
+    background: var(--bg-softer);
+    border: 1px dashed #C9D1DA;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    display: grid; place-items: center;
+    font-size: 13px;
+  }
+
+  /* ===== Footer ===== */
+  footer.f {
+    background: var(--navy);
+    color: white;
+    padding: 0 0 16px;
+  }
+  footer.f .acc {
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 16px;
+    font-size: 22px;
+    font-weight: 400;
+    cursor: pointer;
+  }
+  footer.f .acc svg { width: 14px; height: 10px; color: var(--blue); }
+  footer.f .legal {
+    background: white;
+    color: var(--text-secondary);
+    padding: 24px 16px 32px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  footer.f .legal .small-bold { font-weight: 700; }
+  footer.f .socials {
+    display: flex; gap: 12px; padding: 18px 0;
+    justify-content: center;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 16px;
+  }
+  footer.f .socials .s {
+    width: 36px; height: 36px; border-radius: 4px;
+    display: grid; place-items: center;
+    background: var(--navy); color: white;
+    font-size: 14px;
+  }
+
+  /* Decorative SVG colour helpers */
+  .stroke-blue { stroke: var(--blue); }
+  .fill-blue { fill: var(--blue); }
+</style>
+</head>
+<body>
+<div class="device">
+
+  <header>
+    <div class="status-band">FEVER</div>
+    <!-- Merlin partner banner — shared across the in-app flow. -->
+    <div style="background:#092241; text-align:center; padding:8px 0;">
+      <img src="Merlin.png" alt="Merlin" style="height:16px; display:inline-block; vertical-align:middle;" />
+    </div>
+    <nav class="nav">
+      <button class="nav-btn" aria-label="Book now">
+        <span class="ic">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        </span>
+        <span>Book Now</span>
+      </button>
+      <div class="nav-logo"><span class="eye-mark"></span>London Eye</div>
+      <button class="menu-btn" aria-label="Menu">
+        <span class="lines"><span></span><span></span><span></span></span>
+        <span>Menu</span>
+      </button>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-img"></div>
+    <div class="hero-bottom-grad"></div>
+    <div class="hero-content">
+      <div class="hero-pill">360° Views of London's Skyline from £29</div>
+      <h1 class="hero-title">The World's Most Iconic<br/>Ride</h1>
+    </div>
+    <div class="hero-dots"><span class="active"></span><span></span><span></span></div>
+    <div class="hero-cta-wrap">
+      <a class="btn-primary" href="schedule.html">BOOK NOW</a>
+    </div>
+  </section>
+
+  <section class="quick-links" aria-label="Popular tickets">
+    <a class="ql" href="schedule.html">
+      <span class="ql-ic">
+        <svg viewBox="0 0 48 48" fill="currentColor"><path d="M8 16h32v22a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V16Zm0-4V8a4 4 0 0 1 4-4h24a4 4 0 0 1 4 4v4H8Zm10 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>
+      </span>
+      <div class="ql-body">
+        <div class="t">Popular tickets</div>
+        <div class="s">Best price guaranteed - tickets from £29 available now!</div>
+      </div>
+      <span class="ql-chev"><svg viewBox="0 0 12 19" fill="none"><path d="M2 2l8 7.5L2 17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    </a>
+    <a class="ql" href="attraction-picker.html">
+      <span class="ql-ic">
+        <svg viewBox="0 0 48 48" fill="currentColor"><circle cx="13" cy="13" r="9"/><circle cx="35" cy="13" r="9"/><circle cx="13" cy="35" r="9"/><circle cx="35" cy="35" r="9"/></svg>
+      </span>
+      <div class="ql-body">
+        <div class="t">Multi-attraction tickets</div>
+        <div class="s">Visit 5 top London attractions for less than £12 each</div>
+      </div>
+      <span class="ql-chev"><svg viewBox="0 0 12 19" fill="none"><path d="M2 2l8 7.5L2 17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    </a>
+    <a class="ql" href="#river-cruise">
+      <span class="ql-ic">
+        <svg viewBox="0 0 48 48" fill="currentColor"><path d="M6 26h36l-4 10H10L6 26Zm5-12h26l3 10H8l3-10Zm6 0V8h14v6"/></svg>
+      </span>
+      <div class="ql-body">
+        <div class="t">London Eye River Cruise</div>
+        <div class="s">See London's most popular landmarks from the Eye and the Thames - only £49</div>
+      </div>
+      <span class="ql-chev"><svg viewBox="0 0 12 19" fill="none"><path d="M2 2l8 7.5L2 17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    </a>
+    <a class="ql" href="#booking-guarantee">
+      <span class="ql-ic">
+        <svg viewBox="0 0 48 48" fill="currentColor"><path d="M24 4l16 6v10c0 10-7 18-16 24C15 38 8 30 8 20V10l16-6Z"/></svg>
+      </span>
+      <div class="ql-body">
+        <div class="t">Booking guarantee</div>
+        <div class="s">Reschedule for free if your plans change</div>
+      </div>
+      <span class="ql-chev"><svg viewBox="0 0 12 19" fill="none"><path d="M2 2l8 7.5L2 17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    </a>
+  </section>
+
+  <div class="plan-row" aria-label="Choose your plan">
+    <div class="plan-card recommended" data-plan="standard">
+      <div class="plan-card-img">
+        <img src="London Eye Portrait.png" alt="London Eye standard ticket"/>
+        <div class="plan-price-tag">
+          <div class="ttl">From</div>
+          <div class="amt">£29</div>
+          <div class="sub">per adult</div>
+        </div>
+      </div>
+      <div class="plan-card-body">
+        <h3>Standard Tickets</h3>
+        <p>Make the most of the sunshine with unforgettable 360° views of London's skyline on a 30-minute rotation. Book online now for the best price and guaranteed entry.</p>
+        <a class="btn-primary" href="schedule.html">BOOK NOW</a>
+      </div>
+    </div>
+    <div class="plan-card" data-plan="multi">
+      <div class="plan-card-img">
+        <img src="22747 London Eye 1B C Fast Track 007 Rgb Ns LICENSED UNTIL JUN2025.png" alt="Multi-attraction pass"/>
+        <div class="plan-price-tag">
+          <div class="ttl">5 attractions</div>
+          <div class="amt">£59</div>
+          <div class="sub">per adult</div>
+        </div>
+      </div>
+      <div class="plan-card-body">
+        <h3>5 Top Attractions - Less Than £12 Each!</h3>
+        <p>Priority Boarding: Beat the queues, board first, and make the most of your London Eye experience.</p>
+        <a class="btn-primary" href="attraction-picker.html">BOOK TOGETHER &amp; SAVE</a>
+      </div>
+    </div>
+  </div>
+  <div class="plan-dots" id="plan-dots" aria-hidden="true">
+    <span class="active"></span><span></span><span></span><span></span>
+  </div>
+  <!-- Champagne Experiences feature -->
+  <section class="feature" id="champagne">
+    <div class="feature-img-wrap">
+      <img class="feature-img" src="London Eye Champagne Experience.png" alt="Champagne experience" />
+      <div class="feature-price-tag">
+        <div class="ttl">From</div>
+        <div class="amt">£49</div>
+        <div class="sub">per adult</div>
+      </div>
+    </div>
+    <div class="feature-body">
+      <h2>Champagne Experiences</h2>
+      <div class="lead">Sip, savour, and enjoy the view!</div>
+      <p>Enjoy a glass of Moët &amp; Chandon Impérial Brut, served by a personal host, as you take in breathtaking panoramic views. Whether it's a stunning sunset over the city or the sparkling lights of London at night, this experience is unforgettable.</p>
+      <a class="btn-primary" href="#">BOOK NOW</a>
+    </div>
+  </section>
+
+  <!-- Multi-attraction feature -->
+  <section class="feature" id="multi-feature">
+    <div class="feature-img-wrap">
+      <img class="feature-img" src="Londons Top Attractions Square.png" alt="London top attractions" />
+      <div class="feature-price-tag">
+        <div class="ttl">5 attractions</div>
+        <div class="amt">£59</div>
+        <div class="sub">per adult</div>
+      </div>
+    </div>
+    <div class="feature-body">
+      <h2>Multi-attraction tickets<br/>for London's top things to do</h2>
+      <div class="lead">Save up to 68% with a London multi-attraction pass — just £59 for 5 top attractions!</div>
+      <p>That's less than £12 per attraction, with 90 days to visit them all. From stunning views on the iconic <strong>London Eye</strong> to mingling with celebrities at <strong>Madame Tussauds</strong> and exploring the deep-sea wonders at <strong>SEA LIFE London Aquarium</strong>, it's the ultimate way to tick off your London bucket list.</p>
+      <a class="btn-primary" href="attraction-picker.html">BOOK TOGETHER &amp; SAVE</a>
+    </div>
+  </section>
+
+  <!-- Plan-your-visit -->
+  <section class="feature" id="plan-your-visit">
+    <img class="feature-img" src="Top down view of the London Eye Pod.png" alt="London Eye pod view of the Thames" style="height: 195px;" />
+    <div class="feature-body">
+      <h2>Get ready for your flight</h2>
+      <p>Get ready for an unforgettable experience with breathtaking 360-degree views of London! To make the most of your visit to the London Eye, explore our handy guide for everything you need to know before you go.</p>
+      <a class="btn-primary" href="#">PLAN YOUR VISIT</a>
+    </div>
+  </section>
+
+  <!-- Reviews -->
+  <section class="stub" id="reviews">
+    <div style="text-align:center; color: var(--blue); font-size: 22px; letter-spacing: 4px;">★★★★★</div>
+    <p style="text-align:center; margin:14px 0;">"The London Eye offers stunning panoramic views of the city's landmarks, making it a must-visit attraction."</p>
+    <div style="text-align:center; color: var(--blue); font-weight: 700;">Michael — Google Reviews</div>
+  </section>
+
+  <!-- About London Eye -->
+  <section class="feature" id="about">
+    <img class="feature-img" src="LE 25Th V1 Crop 1920X1080.png" alt="25 Years of the London Eye" style="height: 260px;" />
+    <div class="feature-body">
+      <h2>About London Eye</h2>
+      <p>Marvel at iconic British landmarks like the Houses of Parliament, Big Ben and Buckingham Palace when visiting The London Eye.</p>
+      <p>Since its grand opening in 2000, the London Eye has been one of the city's most popular attractions. It is the <a href="#" style="color:var(--blue); text-decoration:underline;">world's largest cantilever observation wheel</a> and is 135m tall.</p>
+      <p>Enjoy a glass of champagne in the exclusive <a href="#" style="color:var(--blue); text-decoration:underline;">Eye Lounge</a> before (or after) your London Eye experience. For something special, indulge in the luxurious <a href="#" style="color:var(--blue); text-decoration:underline;">VIP Champagne Experience</a> and savour stunning views.</p>
+      <p>Want something exclusive to share with guests? Book a London Eye <a href="#" style="color:var(--blue); text-decoration:underline;">Private Pod</a> and enjoy unforgettable panoramic views of the city skyline.</p>
+    </div>
+  </section>
+
+  <!-- FAQs stub -->
+  <section class="stub" id="faqs">
+    <h2 style="text-align:center; margin-bottom:24px">FAQs</h2>
+    <div class="preview">8 FAQs · expand/collapse</div>
+    <p style="text-align:center; margin-top:16px; font-size:14px;">Got more questions? Visit our <a href="#" style="color:var(--blue); font-weight:700;">FAQs page</a>.</p>
+  </section>
+
+  <!-- Newsletter stub -->
+  <section class="stub" id="newsletter" style="background:#E8E8E8; border-top:0;">
+    <h2>Sign up to our Newsletter here!</h2>
+    <p>Don't miss out on the latest events at the London Eye.</p>
+    <input type="email" placeholder="Email Address" style="width:100%; height:52px; border:0; padding:0 16px; font-family:inherit; font-size:16px; color:#757575; margin:18px 0 16px;"/>
+    <button class="btn-primary" style="background:var(--navy);">Submit</button>
+  </section>
+
+  <footer class="f">
+    <div class="acc"><span>Tickets</span><svg viewBox="0 0 14 10"><path d="M1 1l6 7 6-7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></div>
+    <div class="acc"><span>Our company</span><svg viewBox="0 0 14 10"><path d="M1 1l6 7 6-7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></div>
+    <div class="acc"><span>Plan your visit</span><svg viewBox="0 0 14 10"><path d="M1 1l6 7 6-7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></div>
+    <div class="acc" style="border-bottom:0"><span>Security &amp; privacy</span><svg viewBox="0 0 14 10"><path d="M1 1l6 7 6-7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></div>
+    <div class="legal">
+      <div class="socials">
+        <div class="s">YT</div><div class="s">IG</div><div class="s">FB</div><div class="s">X</div><div class="s">TT</div>
+      </div>
+      <div class="small-bold">© Merlin Entertainments 2026</div>
+      <p style="margin:8px 0 0;">Conceived and designed by Marks Barfield Architects. Operated by London Eye Management Services Limited as agent for Merlin Attractions Operations Limited.</p>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // Landing = the start of a fresh session. Clear any prior multi-attraction
+  // selection so a standard-plan booking from here doesn't inherit it.
+  try { localStorage.removeItem('feverPickerSelection'); } catch (e) {}
+
+  // Active-dot tracker for the plan-card snap carousel.
+  // Computes the centre of each card relative to the viewport and lights the closest dot.
+  (function () {
+    const row = document.querySelector('.plan-row');
+    const dots = document.querySelectorAll('#plan-dots span');
+    if (!row || !dots.length) return;
+    const cards = row.querySelectorAll('.plan-card');
+    function update() {
+      const rowRect = row.getBoundingClientRect();
+      const rowCentre = rowRect.left + rowRect.width / 2;
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      cards.forEach((c, i) => {
+        const r = c.getBoundingClientRect();
+        const cardCentre = r.left + r.width / 2;
+        const d = Math.abs(cardCentre - rowCentre);
+        if (d < bestDist) { bestDist = d; bestIdx = i; }
+      });
+      dots.forEach((d, i) => d.classList.toggle('active', i === bestIdx));
+    }
+    row.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  })();
+</script>
+</body>
+</html>
