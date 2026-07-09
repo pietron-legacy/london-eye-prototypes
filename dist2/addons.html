@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<script>window.addEventListener("pageshow",function(e){if(e.persisted)location.reload();});</script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Fever — Add more to your visit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --eye-text-black: #1A1A1A;
+    --eye-text-secondary: #8C8C8C;
+    --eye-neutral-400: #7D8E98;
+    --eye-text-dark: #031419;
+    --eye-background-white: #FFFFFF;
+    --eye-background-gray: #E8E8E8;
+    --eye-background-gray-light: #F4F4F4;
+    --eye-action-primary: #3A6FA0;
+    --eye-action-gray: #CED3D9;
+    --eye-action-gray-dark: #BCC1CA;
+    --eye-action-secondary: #092241;
+    --border-main: #CCD2D8;
+    --danger: #EB0052;
+    --page-bg: #FFFFFF;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Barlow', sans-serif; }
+  html, body { margin: 0; padding: 0; background: #d8d8d8; -webkit-font-smoothing: antialiased; min-height: 100%; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px 0; }
+  .device { width: 393px; height: 852px; background: var(--page-bg); position: relative; overflow: hidden; display: flex; flex-direction: column; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.08); }
+  @media (max-width: 430px) { body { background:#fff; padding:0; align-items:stretch; } .device { width:100%; height:100dvh; border-radius:0; box-shadow:none; } }
+
+  .ios-status { height: 58px; padding: 21px 16px 0; background: white; display: flex; align-items: center; justify-content: space-between; font-family: -apple-system, 'SF Pro', Inter, sans-serif; flex-shrink: 0; }
+  .ios-status .time { font-size: 17px; font-weight: 590; }
+  .ios-status .icons { display: flex; gap: 7px; align-items: center; font-size: 13px; }
+  .merlin-banner { background: #092241; text-align: center; padding: 8px 0; flex-shrink: 0; }
+  .merlin-banner img { height: 16px; display: inline-block; vertical-align: middle; }
+
+  .sheet { background: white; box-shadow: 0 -6px 6px rgba(0,70,121,0.20); flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-top: 7px; }
+  .sheet-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; }
+  .sheet-header .placeholder { width: 36px; height: 36px; }
+  .sheet-header .title { flex: 1; text-align: center; color: #000; font-size: 18px; font-weight: 700; line-height: 18px; }
+  .sheet-header .back { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: 0; color: #000; padding: 0; }
+  .sheet-header .back svg { width: 24px; height: 24px; }
+
+  /* 2-step progress stepper */
+  .stepper { display: flex; gap: 8px; padding: 0 16px 16px; }
+  .stepper .seg { flex: 1 1 0; height: 4px; border-radius: 100px; background: var(--eye-background-gray); }
+  .stepper .seg.done { background: var(--eye-action-gray-dark); }
+
+  .content { flex: 1; overflow-y: auto; padding: 0 16px 300px; scroll-behavior: smooth; }
+  .content::-webkit-scrollbar { display: none; }
+  .content { scrollbar-width: none; }
+  .intro { color: var(--eye-text-black); font-size: 16px; font-weight: 400; line-height: 24px; padding: 16px 0; }
+
+  /* Add-on card */
+  .addon { padding: 12px; background: white; border-radius: 8px; outline: 1px solid var(--eye-background-gray); outline-offset: -1px; display: flex; flex-direction: column; gap: 24px; margin-bottom: 16px; transition: outline-color 200ms; }
+  .addon.active { outline-color: var(--border-main); }
+  .addon-top { display: flex; align-items: flex-start; gap: 16px; }
+  .addon-text { flex: 1 1 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .addon-name { color: var(--eye-text-dark); font-size: 20px; font-weight: 500; line-height: 24px; }
+  .addon-desc { color: var(--eye-action-secondary); font-size: 16px; font-weight: 400; line-height: 24px; }
+  .addon-thumb { width: 108px; height: 108px; border-radius: 8px; flex-shrink: 0; object-fit: cover; background: var(--eye-background-gray-light); }
+  .addon-bottom { display: flex; align-items: center; gap: 16px; }
+  .addon-price-wrap { flex: 1 1 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+  .addon-price { color: var(--eye-text-dark); font-size: 16px; line-height: 24px; }
+  .addon-price .lead { font-weight: 400; }
+  .addon-price s { font-weight: 400; color: var(--eye-text-dark); }
+  .addon-price strong { font-weight: 700; }
+  .off-badge { height: 20px; min-width: 48px; padding: 2px 6px; background: var(--danger); border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; color: #fff; font-size: 12px; line-height: 16px; }
+  .off-badge svg { width: 12px; height: 12px; }
+
+  /* Quantity stepper control */
+  .qty { width: 112px; background: var(--eye-background-gray-light); border-radius: 32px; display: flex; align-items: center; justify-content: center; padding: 4px; gap: 0; }
+  .qty-btn { width: 32px; height: 32px; border-radius: 64px; border: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 150ms; padding: 0; }
+  .qty-btn svg { width: 13px; height: 13px; display: block; }
+  .qty-minus { background: var(--eye-background-gray); }
+  .qty-minus svg path { fill: var(--eye-action-gray-dark); }
+  .qty-minus.enabled { background: var(--eye-action-secondary); cursor: pointer; }
+  .qty-minus.enabled svg path { fill: #fff; }
+  .qty-plus { background: var(--eye-action-secondary); }
+  .qty-plus svg path { fill: #fff; }
+  .qty-plus.disabled { background: var(--eye-background-gray); cursor: not-allowed; }
+  .qty-plus.disabled svg path { fill: var(--eye-action-gray-dark); }
+  .qty-num { flex: 1 1 0; text-align: center; color: var(--eye-text-black); font-size: 16px; line-height: 24px; padding: 0 4px; }
+  .qty-btn:not(.disabled):active { transform: scale(0.9); }
+
+  /* ===== Footer (bottom sheet, expandable) ===== */
+  .footer { position: absolute; bottom: 0; left: 0; right: 0; background: white; box-shadow: 0 -6px 6px rgba(0,70,121,0.20); padding: 16px; display: flex; flex-direction: column; gap: 16px; z-index: 10; }
+  .footer-grabber { width: 70px; height: 4px; background: #DDDDDD; border-radius: 100px; margin: 0 auto; cursor: pointer; }
+  .footer-top { display: flex; align-items: center; gap: 16px; }
+  .footer-thumb { width: 84px; height: 84px; border-radius: 8px; flex-shrink: 0; overflow: hidden; background: #ECE3D3; }
+  .footer-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* Collage of London Eye + selected attractions (same as the upsell step). */
+  .thumb-collage { width: 100%; height: 100%; display: grid; position: relative; }
+  .thumb-collage > img { width: 100%; height: 100%; object-fit: cover; display: block; min-width: 0; min-height: 0; }
+  .thumb-collage-1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  .thumb-collage-2 { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  .thumb-collage-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .thumb-collage-3 > img:nth-child(1) { grid-column: 1 / 3; grid-row: 1; }
+  .thumb-collage-3 > img:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .thumb-collage-3 > img:nth-child(3) { grid-column: 2; grid-row: 2; }
+  .thumb-collage-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .thumb-collage-5 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .thumb-collage-5 > img:nth-child(5) { position: absolute; width: 50%; height: 50%; top: 25%; left: 25%; border-radius: 50%; }
+  .thumb-collage > img[data-id="tussauds"] { object-position: center top; }
+  .footer-summary-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .footer-pretitle { color: var(--eye-text-secondary); font-size: 16px; font-weight: 500; line-height: 1.2; }
+  .footer-contents { color: var(--eye-text-black); font-size: 20px; font-weight: 600; line-height: 1.2; }
+  .footer-ticket-count { display: flex; align-items: center; gap: 4px; color: var(--eye-text-secondary); font-size: 20px; line-height: 1.2; margin-top: 2px; }
+
+  .footer-breakdown { max-height: 0; overflow: hidden; margin-top: -16px; transition: max-height 420ms cubic-bezier(0.4,0,0.2,1), margin-top 420ms cubic-bezier(0.4,0,0.2,1); }
+  .footer.is-expanded .footer-breakdown { max-height: 480px; margin-top: 0; }
+  .bd-divider { height: 1px; background: var(--eye-background-gray); margin: 0 0 16px; }
+  .bd-section-title { font-size: 16px; font-weight: 600; color: var(--eye-text-black); margin-bottom: 4px; }
+  .bd-ticket-line { font-size: 14px; font-weight: 600; color: var(--eye-neutral-400); line-height: 20px; }
+  .bd-tickets { margin-bottom: 16px; }
+  .bd-priced + .bd-priced { margin-top: 16px; }
+  .bd-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .bd-row .name, .bd-row .amount { font-size: 16px; font-weight: 600; color: var(--eye-text-black); }
+  .bd-eye-date { font-size: 14px; font-style: italic; color: var(--eye-neutral-400); margin-top: 2px; }
+  .bd-bundle-list { margin: 4px 0 0; padding-left: 18px; }
+  .bd-bundle-list li { color: var(--eye-neutral-400); font-size: 14px; line-height: 20px; }
+  /* Cluster Bundle: sections (price row, London Eye visit, scheduled-after) are 8px apart;
+     the italic lead + bold names WITHIN each section stay tight. No bullets. */
+  .bd-bundle-block { display: flex; flex-direction: column; gap: 8px; }
+  .bd-bundle-lead { font-size: 14px; font-style: italic; color: var(--eye-neutral-400); line-height: 20px; }
+  .bd-bundle-names { font-size: 14px; font-weight: 600; color: var(--eye-neutral-400); line-height: 20px; }
+  /* "You are choosing add-ons for… / London Eye" banner at the top of the page. */
+  .addon-banner { display: flex; align-items: center; gap: 8px; background: #E7F1FA; border-radius: 8px; padding: 8px; margin: 16px 0 0; }
+  .addon-banner img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+  .addon-banner .ab-sub { color: var(--eye-action-secondary); font-size: 14px; font-weight: 500; }
+  .addon-banner .ab-main { color: var(--eye-text-dark); font-size: 18px; font-weight: 400; line-height: 24px; }
+
+  .continue-btn { width: 100%; height: 48px; background: var(--eye-action-primary); color: white; font-size: 20px; font-weight: 400; border: 0; border-radius: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.3px; }
+  .continue-btn:active { opacity: 0.85; }
+
+  .rn { display: inline-block; }
+</style>
+</head>
+<body>
+<div class="device">
+  <div class="ios-status"><span class="time">9:41</span><span class="icons">▌▌▌ 📶 🔋</span></div>
+  <a class="merlin-banner" href="index.html" aria-label="Back to London Eye home" style="text-decoration:none; display:block;"><img src="Merlin.png" alt="Merlin"/></a>
+
+  <div class="sheet">
+    <div class="sheet-header">
+      <button class="back" aria-label="Back" onclick="nav('schedule.html')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="title">Add more to your visit</div>
+      <div class="placeholder"></div>
+    </div>
+
+    <!-- Step 1 of 2 (add-ons). Step 2 is the "Add now and save" attractions page.
+         Hidden in the cluster flow, where add-ons go straight to checkout (no step 2). -->
+    <div class="stepper" id="stepper"><div class="seg done"></div><div class="seg"></div></div>
+
+    <div class="content">
+      <div class="addon-banner">
+        <img src="London Eye.jpg" alt="London Eye" />
+        <div><div class="ab-sub">You are choosing add-ons for...</div><div class="ab-main">London Eye</div></div>
+      </div>
+      <p class="intro">Enjoy exclusive online prices on add-ons, cheaper than at the gate!</p>
+      <div id="addons-list"><!-- injected --></div>
+    </div>
+
+    <div class="footer" id="footer">
+      <div class="footer-grabber" id="footer-grabber" role="button" aria-label="Toggle order details"></div>
+      <div class="footer-top">
+        <div class="footer-thumb" id="footer-thumb"><img src="London Eye.jpg" alt="London Eye"/></div>
+        <div class="footer-summary-info">
+          <div class="footer-pretitle">Your selection</div>
+          <div class="footer-contents">London Eye - Standard ticket</div>
+          <div class="footer-ticket-count">
+            <svg width="22" height="22" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.625 7C4.625 6.53516 5.00781 6.125 5.5 6.125H12.5C12.9648 6.125 13.375 6.53516 13.375 7V10.5C13.375 10.9922 12.9648 11.375 12.5 11.375H5.5C5.00781 11.375 4.625 10.9922 4.625 10.5V7ZM5.5 10.5H12.5V7H5.5V10.5ZM16.875 5.25V7.4375C16.1367 7.4375 15.5625 8.03906 15.5625 8.75C15.5625 9.48828 16.1367 10.0625 16.875 10.0625V12.25C16.875 13.2344 16.082 14 15.125 14H2.875C1.89062 14 1.125 13.2344 1.125 12.25V10.0625C1.83594 10.0625 2.4375 9.48828 2.4375 8.75C2.4375 8.03906 1.83594 7.4375 1.125 7.4375V5.25C1.125 4.29297 1.89062 3.5 2.875 3.5H15.125C16.082 3.5 16.875 4.29297 16.875 5.25ZM2 6.75391C2.76562 7.08203 3.3125 7.875 3.3125 8.75C3.3125 9.65234 2.76562 10.418 2 10.7734V12.25C2 12.7422 2.38281 13.125 2.875 13.125H15.125C15.5898 13.125 16 12.7422 16 12.25V10.7734C15.207 10.418 14.6875 9.65234 14.6875 8.75C14.6875 7.875 15.207 7.08203 16 6.75391V5.25C16 4.78516 15.5898 4.375 15.125 4.375H2.875C2.38281 4.375 2 4.78516 2 5.25V6.75391Z" fill="#8C8C8C"/></svg>
+            <span id="footer-ticket-count">x 5 tickets</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-breakdown" id="footer-breakdown"></div>
+      <button class="continue-btn" onclick="goToUpsell()"><span id="continue-btn-text">CONTINUE - £126.00</span></button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== Add-on catalogue =====
+  // River cruise & binoculars: flat online price. Champagne & photo: 25%-off online deal
+  // (was → now). All prices are per unit; a unit is added per person up to the ticket count.
+  const ADDONS = [
+    { id: 'river', name: 'River cruise',                    desc: "Sail along the Thames and enjoy unique views of London's iconic riverside landmarks.", price: 15, image: 'data:image/png;base64,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' },
+    { id: 'bino',  name: 'Mini-Binoculars',                 desc: "Zoom in on the city's highlights",                                                     price: 5,  image: 'data:image/png;base64,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' },
+    { id: 'champ', name: 'Glass of Champagne in the Eye Lounge', desc: 'Enjoy a glass of champagne before your flight',                                    price: 18, was: 21, off: 25, image: 'data:image/png;base64,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' },
+    { id: 'photo', name: 'Premium Photo Package',           desc: 'Make your moment unforgettable',                                                       price: 25, was: 28, off: 25, image: 'data:image/png;base64,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' },
+  ];
+
+  const TICKET_ICON = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.625 7C4.625 6.53516 5.00781 6.125 5.5 6.125H12.5C12.9648 6.125 13.375 6.53516 13.375 7V10.5C13.375 10.9922 12.9648 11.375 12.5 11.375H5.5C5.00781 11.375 4.625 10.9922 4.625 10.5V7ZM5.5 10.5H12.5V7H5.5V10.5Z" fill="#8C8C8C"/></svg>`;
+  const MINUS_SVG = `<svg viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 5.75h13v1.5H0z"/></svg>`;
+  const PLUS_SVG  = `<svg viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.75 0h1.5v5.75H13v1.5H7.25V13h-1.5V7.25H0v-1.5h5.75z"/></svg>`;
+  const OFF_ICON  = `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2.5A5.5 5.5 0 108 13.5 5.5 5.5 0 008 2.5zM7.4 5.2h1.2v1.2H7.4V5.2zm0 2.2h1.2v3.4H7.4V7.4z" fill="#fff"/></svg>`;
+
+  // ===== Carry from the schedule page (tickets + date). Falls back to £126 / 5 tickets. =====
+  const LONDON_EYE_PRICE = 126;
+  // Demo default (used when opened standalone) mirrors a 2 adult + 2 child + 1 under-2 selection.
+  const DEFAULT_TICKETS = [
+    { name: 'Adult (16+)', qty: 2, price: 63 },
+    { name: 'Child (2 - 15 Years)', qty: 2, price: 0 },
+    { name: 'Under 2', qty: 1, price: 0 },
+  ];
+  // Present-day default so the prototype is never stuck on a fixed date.
+  const _t = new Date();
+  const TODAY = `${_t.toLocaleDateString('en-GB', { weekday: 'long' })}, ${_t.getDate()} ${_t.toLocaleDateString('en-GB', { month: 'short' })}`;
+  let carry = { tickets: DEFAULT_TICKETS, date: TODAY, timeslot: '10:00 AM', total: LONDON_EYE_PRICE, ticketCount: 5 };
+  try {
+    const raw = localStorage.getItem('feverScheduleCarry');
+    if (raw) {
+      const c = JSON.parse(raw);
+      const tCount = (c.tickets || []).reduce((s, t) => s + (t.qty || 0), 0);
+      carry = {
+        tickets: (c.tickets && c.tickets.length) ? c.tickets : DEFAULT_TICKETS,
+        addons: c.addons || [],
+        date: c.date || TODAY,
+        timeslot: c.timeslot || '10:00 AM',
+        total: (c.tickets || []).reduce((s, t) => s + (t.qty || 0) * (t.price || 0), 0) || LONDON_EYE_PRICE,
+        ticketCount: tCount || 5,
+      };
+    }
+  } catch (e) { /* localStorage blocked */ }
+
+  let londonEyeBase = carry.total; // cluster mode overrides this with the full bundle total below
+  const ticketCount = carry.ticketCount;
+  const MAX_PER = Math.max(1, ticketCount); // up to one add-on per ticket
+
+  // ===== Secondary attractions carried back from the upsell page (same pricing model) =====
+  // If the user picked attractions on the "Add now and save" step and comes back here, we
+  // show them (as a Bundle line) and include their price in the total.
+  const STD_BUNDLED = { 1: 33, 2: 28, 3: 24, 4: 21 };
+  const BUS_BUNDLED = { 1: 43, 2: 38, 3: 34, 4: 31 };
+  const ATTRACTIONS = [
+    { id: 'tussauds', name: 'Madame Tussauds',    bundled: STD_BUNDLED, image: 'Madame Tussauds.png' },
+    { id: 'sealife',  name: 'SEA Life Aquarium',  bundled: STD_BUNDLED, image: 'SEA Life Aquarium.png' },
+    { id: 'shreks',   name: "Shrek's adventure",  bundled: STD_BUNDLED, image: "Shrek's Adventure.png" },
+    { id: 'dungeon',  name: 'The London Dungeon', bundled: STD_BUNDLED, image: 'The London Dungeon.png' },
+    { id: 'bigbus',   name: 'Big Bus',            bundled: BUS_BUNDLED, image: 'Big Bus.png' },
+  ];
+  // Cluster flow (came from the picker): attractions come from feverPickerSelection and their
+  // price is ALREADY inside the bundle ticket total, so we don't re-add it here (no Bundle line).
+  // Standard flow: attractions come back from the cross-sell (feverBundleAttractions), priced.
+  let attractions = [], clusterMode = false;
+  try {
+    const picker = JSON.parse(localStorage.getItem('feverPickerSelection') || 'null');
+    if (picker && picker.mode === 'multi' && Array.isArray(picker.attractions)) {
+      clusterMode = true;
+      attractions = picker.attractions.filter(id => id !== 'londoneye').map(id => ATTRACTIONS.find(a => a.id === id)).filter(Boolean);
+    } else {
+      const ids = JSON.parse(localStorage.getItem('feverBundleAttractions') || '[]');
+      attractions = ids.map(id => ATTRACTIONS.find(a => a.id === id)).filter(Boolean);
+    }
+  } catch (e) {}
+  // In the cluster flow the full bundle total (London Eye + secondaries) was already computed on
+  // the plan view and stored in feverCheckout — use it as the base so we don't recompute prices.
+  if (clusterMode) {
+    try {
+      const co = JSON.parse(localStorage.getItem('feverCheckout') || 'null');
+      // Prefer the add-on-free bundleBase so re-entry (back from checkout) doesn't inflate it.
+      if (co && typeof co.bundleBase === 'number') londonEyeBase = co.bundleBase;
+      else if (co && typeof co.total === 'number') londonEyeBase = co.total;
+    } catch (e) {}
+  }
+  const attractionsTotal = () => {
+    if (clusterMode) return 0; // bundle price already in the ticket total
+    const n = attractions.length; if (!n) return 0;
+    const clamp = Math.max(1, Math.min(4, n));
+    return attractions.reduce((s, a) => s + a.bundled[clamp], 0);
+  };
+
+  // ===== State =====
+  const qty = { river: 0, bino: 0, champ: 0, photo: 0 };
+  // Restore add-ons the user already picked (so returning here keeps the same selection/price).
+  (carry.addons || []).forEach(a => { if (a && a.id in qty) qty[a.id] = a.qty || 0; });
+  const addonById = id => ADDONS.find(a => a.id === id);
+  const addonsTotal = () => ADDONS.reduce((s, a) => s + qty[a.id] * a.price, 0);
+  const grandTotal = () => londonEyeBase + attractionsTotal() + addonsTotal();
+
+  // ===== Render =====
+  function priceHTML(a) {
+    if (a.off) {
+      return `<span class="off-badge">${OFF_ICON}${a.off}% off</span>
+              <div class="addon-price"><span class="lead">Add for </span><s>£${a.was}.00</s> <strong>£${a.price}.00</strong></div>`;
+    }
+    return `<div class="addon-price"><strong>£${a.price}.00</strong></div>`;
+  }
+
+  function buildAddons() {
+    const list = document.getElementById('addons-list');
+    list.innerHTML = '';
+    ADDONS.forEach(a => {
+      const card = document.createElement('div');
+      card.className = 'addon';
+      card.dataset.id = a.id;
+      card.innerHTML = `
+        <div class="addon-top">
+          <div class="addon-text">
+            <div class="addon-name">${a.name}</div>
+            <div class="addon-desc">${a.desc}</div>
+          </div>
+          <img class="addon-thumb" src="${a.image}" alt="" />
+        </div>
+        <div class="addon-bottom">
+          <div class="addon-price-wrap">${priceHTML(a)}</div>
+          <div class="qty">
+            <button class="qty-btn qty-minus" data-act="dec" data-id="${a.id}" aria-label="Remove one">${MINUS_SVG}</button>
+            <span class="qty-num" id="qty-${a.id}">0</span>
+            <button class="qty-btn qty-plus" data-act="inc" data-id="${a.id}" aria-label="Add one">${PLUS_SVG}</button>
+          </div>
+        </div>`;
+      list.appendChild(card);
+    });
+  }
+
+  function refreshCard(id) {
+    const n = qty[id];
+    document.getElementById('qty-' + id).textContent = n;
+    const card = document.querySelector('.addon[data-id="' + id + '"]');
+    card.classList.toggle('active', n > 0);
+    card.querySelector('.qty-minus').classList.toggle('enabled', n > 0);
+    card.querySelector('.qty-plus').classList.toggle('disabled', n >= MAX_PER);
+  }
+
+  function renderBreakdown() {
+    const rows = [];
+    if (clusterMode) {
+      // Cluster: Tickets recap, then a single "Bundle" line (the whole bundle price) broken down
+      // into the London Eye visit (with its date) and the secondaries scheduled after purchase.
+      const ticketLines = (carry.tickets || [])
+        .filter(t => (t.qty || 0) > 0)
+        .map(t => `<div class="bd-ticket-line">${t.name} x ${t.qty}</div>`).join('');
+      const schedBlock = attractions.length
+        ? `<div>
+             <div class="bd-bundle-lead">Schedule after purchase</div>
+             <div class="bd-bundle-names">${attractions.map(a => a.name).join('<br/>')}</div>
+           </div>`
+        : '';
+      rows.push(`<div class="bd-divider"></div>`);
+      rows.push(`<div class="bd-tickets"><div class="bd-section-title">Tickets</div>${ticketLines}</div>`);
+      rows.push(`<div class="bd-divider"></div>`);
+      rows.push(`<div class="bd-priced bd-bundle-block">
+          <div class="bd-row"><span class="name">Bundle</span><span class="amount">£${londonEyeBase}.00</span></div>
+          <div>
+            <div class="bd-bundle-lead">${carry.date} - ${carry.timeslot}</div>
+            <div class="bd-bundle-names">London Eye</div>
+          </div>
+          ${schedBlock}
+        </div>`);
+    } else {
+      // Standard: Tickets recap + London Eye plan line, plus any Bundle carried back from the upsell.
+      const ticketLines = (carry.tickets || [])
+        .filter(t => (t.qty || 0) > 0)
+        .map(t => `<div class="bd-ticket-line">${t.name} x ${t.qty}</div>`).join('');
+      rows.push(`<div class="bd-divider"></div>`);
+      rows.push(`<div class="bd-tickets"><div class="bd-section-title">Tickets</div>${ticketLines}</div>`);
+      rows.push(`<div class="bd-divider"></div>`);
+      rows.push(`<div class="bd-priced">
+          <div class="bd-row"><span class="name">London Eye</span><span class="amount">£${londonEyeBase}.00</span></div>
+          <div class="bd-eye-date">${carry.date} - ${carry.timeslot}</div>
+        </div>`);
+      if (attractions.length) {
+        const names = attractions.map(a => `<li>${a.name}</li>`).join('');
+        rows.push(`<div class="bd-priced">
+            <div class="bd-row"><span class="name">Bundle</span><span class="amount">£${attractionsTotal()}.00</span></div>
+            <div class="bd-eye-date">Schedule after purchase</div>
+            <ul class="bd-bundle-list">${names}</ul>
+          </div>`);
+      }
+    }
+    ADDONS.filter(a => qty[a.id] > 0).forEach(a => {
+      rows.push(`<div class="bd-priced"><div class="bd-row"><span class="name">${a.name} x ${qty[a.id]}</span><span class="amount">£${qty[a.id] * a.price}.00</span></div></div>`);
+    });
+    document.getElementById('footer-breakdown').innerHTML = rows.join('');
+  }
+
+  function renderFooter() {
+    if (clusterMode) {
+      // Cluster: the header reflects the primary product (London Eye ticket); the bundle breakdown
+      // below lists the scheduled-after attractions. Single London Eye thumbnail.
+      document.querySelector('.footer-contents').textContent = 'London Eye - Standard ticket';
+      document.getElementById('footer-thumb').innerHTML = '<img src="London Eye.jpg" alt="London Eye"/>';
+    } else {
+      document.querySelector('.footer-contents').textContent = attractions.length
+        ? `London Eye + ${attractions.length} attraction${attractions.length > 1 ? 's' : ''}`
+        : 'London Eye - Standard ticket';
+      // Thumbnail collage: London Eye + selected attractions (matches the upsell step).
+      const cells = ['<img src="London Eye.jpg" alt="London Eye" data-id="eye" />']
+        .concat(attractions.map(a => `<img src="${a.image}" alt="${a.name}" data-id="${a.id}" />`));
+      document.getElementById('footer-thumb').innerHTML = `<div class="thumb-collage thumb-collage-${cells.length}">${cells.join('')}</div>`;
+    }
+    document.getElementById('footer-ticket-count').textContent = 'x ' + ticketCount + ' tickets';
+    document.getElementById('continue-btn-text').innerHTML =
+      `CONTINUE - <span class="rn" data-key="cta" data-pre="£" data-suf=".00" data-val="${grandTotal()}">£${grandTotal()}.00</span>`;
+    renderBreakdown();
+  }
+
+  // ===== Count-up number animation (shared pattern with the upsell page) =====
+  const lastNums = {};
+  function animateRolls() {
+    document.querySelectorAll('.rn').forEach(el => {
+      const key = el.dataset.key, to = parseInt(el.dataset.val, 10);
+      const pre = el.dataset.pre || '', suf = el.dataset.suf || '';
+      const from = (key in lastNums) ? lastNums[key] : to;
+      lastNums[key] = to;
+      if (from === to) { el.textContent = pre + to + suf; return; }
+      el.textContent = pre + from + suf;
+      tweenNumber(el, from, to, pre, suf);
+    });
+  }
+  function tweenNumber(el, from, to, pre, suf) {
+    const dur = 420, start = performance.now();
+    let finished = false;
+    const settle = () => { if (!finished) { finished = true; el.textContent = pre + to + suf; } };
+    function frame(t) {
+      if (finished) return;
+      let p = Math.min(1, (t - start) / dur);
+      if (p >= 1) { settle(); return; }
+      p = 1 - Math.pow(1 - p, 3);
+      el.textContent = pre + Math.round(from + (to - from) * p) + suf;
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+    setTimeout(settle, dur + 80);
+  }
+
+  function fullRender() { renderFooter(); animateRolls(); }
+
+  // ===== Events =====
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn || btn.classList.contains('disabled')) return;
+    const id = btn.dataset.id;
+    if (btn.dataset.act === 'inc') { if (qty[id] >= MAX_PER) return; qty[id]++; }
+    else { if (qty[id] <= 0) return; qty[id]--; }
+    refreshCard(id);
+    fullRender();
+  });
+
+  function toggleExpand() { document.getElementById('footer').classList.toggle('is-expanded'); }
+  document.getElementById('footer-grabber').addEventListener('click', toggleExpand);
+  document.querySelector('.footer-top').addEventListener('click', toggleExpand);
+
+  // ===== Continue =====
+  // Standard flow → attractions upsell (cross-sell). Cluster flow (came from the picker/plan
+  // view) → straight to checkout, with the chosen add-ons folded into the existing payload.
+  function goToUpsell() {
+    const chosenAddons = ADDONS.filter(a => qty[a.id] > 0).map(a => ({ id: a.id, name: a.name, qty: qty[a.id], unit: a.price }));
+    let isMulti = false;
+    try {
+      const picker = JSON.parse(localStorage.getItem('feverPickerSelection') || 'null');
+      isMulti = !!(picker && picker.mode === 'multi');
+    } catch (e) {}
+
+    try {
+      const payload = {
+        tickets: (carry.tickets && carry.tickets.length)
+          ? carry.tickets
+          : [{ name: 'Adult (16+)', qty: ticketCount, price: +(londonEyeBase / ticketCount).toFixed(2) }],
+        addons: chosenAddons,
+        date: carry.date,
+        timeslot: carry.timeslot,
+        total: londonEyeBase,
+      };
+      localStorage.setItem('feverScheduleCarry', JSON.stringify(payload));
+    } catch (e) { /* localStorage blocked */ }
+
+    if (isMulti) {
+      // Fold the add-ons into the multi checkout payload written by the plan view.
+      try {
+        const co = JSON.parse(localStorage.getItem('feverCheckout') || 'null');
+        if (co) {
+          co.schedule = co.schedule || {};
+          co.schedule.addons = chosenAddons;
+          // Recompute from the stable base so re-continuing doesn't stack add-ons.
+          const base = (typeof co.bundleBase === 'number') ? co.bundleBase : (co.total || 0);
+          co.total = base + addonsTotal();
+          localStorage.setItem('feverCheckout', JSON.stringify(co));
+        }
+      } catch (e) {}
+      nav('checkout.html');
+      return;
+    }
+    nav('fever-bundle-prototype_1.html');
+  }
+
+  // Navigate with a cache-buster so in-app transitions never serve a stale cached page.
+  function nav(url) { window.location.href = (location.protocol === 'file:') ? url : url + (url.indexOf('?') < 0 ? '?' : '&') + 'v=' + Date.now(); }
+
+  // ===== Init =====
+  // The "You are choosing add-ons for… London Eye" banner shows only in the CLUSTER flow; in the
+  // standard flow it's hidden. The 2-step progress stepper is hidden in the cluster flow (which
+  // goes add-ons → checkout directly, with no step 2).
+  if (clusterMode) {
+    const st = document.getElementById('stepper'); if (st) st.style.display = 'none';
+  } else {
+    const banner = document.querySelector('.addon-banner'); if (banner) banner.style.display = 'none';
+  }
+  buildAddons();
+  ADDONS.forEach(a => refreshCard(a.id));
+  fullRender();
+</script>
+</body>
+</html>
